@@ -1,0 +1,54 @@
+{
+  "orderHash": "0x0ba15f30296bfdfe9af9bf6356c59fc1249c9e18c0cdb0c914a8c5ca988fe84a",
+  "maker": "0xc15e658ac13a89e8d2e5adbbcf29d5d168554553",
+  "receiver": "0x0000000000000000000000000000000000000000",
+  "makingAmount": "100000000",
+  "takingAmount": "99000000",
+  "makerAsset": "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238",
+  "takerAsset": "0xda0000d4000015a526378bb6fafc650cea5966f8",
+  "makerTraits": "62419173104490761595518734107389834172469088534107255959696655437341485170688",
+  "salt": "1431199447458042394085953897601120864058602940003179",
+  "srcChainId": 1,
+  "actualSrcChainId": 11155111,
+  "dstChainId": 56,
+  "secret": "0x7a9b0565e98cfd1c09fa3237b37eee975e9a4f3b734da08ce4f76ec87880e201",
+  "signature": "0x6c43f4a1a531f7242ddb4894386fa0da8dd788b4544883e058c372fd42ee165709bd7b45082c7e5cc3e7097c2dcccb3624a5fa6a5db3ad95297e36d39db86d261b",
+  "srcEscrowFactory": "0xb81f8c00C7ca349c11787448619bC3Da9d05F798",
+  "status": "SRC_DEPLOYED",
+  "createdAt": "2025-07-27T07:03:27.225Z",
+  "orderSerialized": "{\"maker\":\"0xc15e658ac13a89e8d2e5adbbcf29d5d168554553\",\"makerAsset\":\"0x1c7d4b196cb0c7b01d743fbc6116a902379c7238\",\"takerAsset\":\"0xda0000d4000015a526378bb6fafc650cea5966f8\",\"makerTraits\":\"62419173104490761595518734107389834172469088534107255959696655437341485170688\",\"salt\":\"1431199447458042394085953897601120864058602940003179\",\"makingAmount\":\"100000000\",\"takingAmount\":\"99000000\",\"receiver\":\"0x0000000000000000000000000000000000000000\"}",
+  "timeLockParams": {
+    "srcWithdrawal": "10",
+    "srcPublicWithdrawal": "120",
+    "srcCancellation": "121",
+    "srcPublicCancellation": "122",
+    "dstWithdrawal": "10",
+    "dstPublicWithdrawal": "100",
+    "dstCancellation": "101"
+  },
+  "safetyDeposits": {
+    "src": "1000000000",
+    "dst": "1000000000"
+  },
+  "resolverAddress": "0x123FeaBefe48F6ADebad20d27e763bBE1631b8FB",
+  "allowPartialFills": false,
+  "allowMultipleFills": false,
+  "srcEscrowAddress": "0xcE59D633E40Cfbe8DEd6CE921Ecb6b89d678db1E",
+  "srcDeploymentTx": "0xf77b0f722b0e77b0e918fb0c2cc5879d607065eae20186f004bae68b6a2a5f2c",
+  "srcDeploymentBlock": "8867743",
+  "srcDeploymentTimestamp": "2025-07-29T11:23:53.440Z",
+  "deployedImmutables": {
+    "orderHash": "0x0ba15f30296bfdfe9af9bf6356c59fc1249c9e18c0cdb0c914a8c5ca988fe84a",
+    "hashlock": "0x4d66ba415b426e3e9654d5d29be139de7f67de6e8c0551dfe86c7751acdef4d0",
+    "maker": "684656566477631048863162091847210048815389373532",
+    "taker": "684656566477631048863162091847210048815389373532",
+    "token": "0",
+    "amount": "1000000000000000",
+    "safetyDeposit": "1000000000000000",
+    "timelocks": "47282037092356627008542623659718344764240381075005525631312517254000203005962"
+  },
+  "dstImmutablesComplement": {
+    "chainId": "11155111",
+    "amount": "1000000000000000"
+  }
+}
