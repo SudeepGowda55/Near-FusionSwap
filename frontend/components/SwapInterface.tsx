@@ -6,6 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ChevronDown, ArrowUpDown, RefreshCw, Shuffle } from "lucide-react";
 import { useState } from "react";
 import { TokenSelectModal } from "./TokenSelectModal";
+import { TransactionModal } from "./TransactionModal";
+import { ConfirmSwapModal } from "./ConfirmSwapModal";
 
 interface Token {
   symbol: string;
@@ -15,7 +17,12 @@ interface Token {
   networks: number;
 }
 
-export const SwapInterface = () => {
+interface SwapInterfaceProps {
+  isWalletConnected?: boolean;
+  onConnectWallet?: () => void;
+}
+
+export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: SwapInterfaceProps) => {
   const [fromToken, setFromToken] = useState<Token>({
     symbol: "ETH",
     name: "Ether",
@@ -37,6 +44,9 @@ export const SwapInterface = () => {
   const [isFromTokenModalOpen, setIsFromTokenModalOpen] = useState(false);
   const [isToTokenModalOpen, setIsToTokenModalOpen] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [isSigningModalOpen, setIsSigningModalOpen] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [isCompletedModalOpen, setIsCompletedModalOpen] = useState(false);
 
   const handleSwapTokens = () => {
     const tempToken = fromToken;
@@ -45,6 +55,27 @@ export const SwapInterface = () => {
     setToToken(tempToken);
     setFromAmount(toAmount);
     setToAmount(tempAmount);
+  };
+
+  const handlePermitAndSwap = () => {
+    // Show signing modal
+    setIsSigningModalOpen(true);
+    
+    // Simulate signing process
+    setTimeout(() => {
+      setIsSigningModalOpen(false);
+      setIsConfirmModalOpen(true);
+    }, 3000);
+  };
+
+  const handleConfirmSwap = () => {
+    setIsConfirmModalOpen(false);
+    setIsCompletedModalOpen(true);
+    
+    // Auto close completion modal after 3 seconds
+    setTimeout(() => {
+      setIsCompletedModalOpen(false);
+    }, 3000);
   };
 
   return (
@@ -187,10 +218,22 @@ export const SwapInterface = () => {
               </div>
             )}
 
-            {/* Connect wallet button */}
-            <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-lg font-medium">
-              Connect wallet
-            </Button>
+            {/* Connect wallet / Permit and swap button */}
+            {isWalletConnected ? (
+              <Button 
+                onClick={handlePermitAndSwap}
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-lg font-medium"
+              >
+                Permit and swap
+              </Button>
+            ) : (
+              <Button 
+                onClick={onConnectWallet}
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-lg font-medium"
+              >
+                Connect wallet
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -205,6 +248,43 @@ export const SwapInterface = () => {
         isOpen={isToTokenModalOpen}
         onClose={() => setIsToTokenModalOpen(false)}
         onSelectToken={(token) => setToToken(token)}
+      />
+
+      {/* Transaction modals */}
+      <TransactionModal
+        isOpen={isSigningModalOpen}
+        onClose={() => setIsSigningModalOpen(false)}
+        title="Please, sign the transaction in your wallet"
+        description=""
+        showCloseButton={true}
+      />
+
+      <ConfirmSwapModal
+        isOpen={isConfirmModalOpen}
+        onClose={() => setIsConfirmModalOpen(false)}
+        onConfirm={handleConfirmSwap}
+        fromToken={{
+          symbol: fromToken.symbol,
+          name: fromToken.name,
+          icon: fromToken.icon,
+          amount: fromAmount,
+          usdValue: "~$0.00374398"
+        }}
+        toToken={{
+          symbol: toToken.symbol,
+          name: toToken.name,
+          icon: toToken.icon,
+          amount: toAmount,
+          usdValue: "~$0.00373131"
+        }}
+      />
+
+      <TransactionModal
+        isOpen={isCompletedModalOpen}
+        onClose={() => setIsCompletedModalOpen(false)}
+        title="Transaction completed"
+        description="Your swap has been successfully processed"
+        showCloseButton={false}
       />
     </div>
   );

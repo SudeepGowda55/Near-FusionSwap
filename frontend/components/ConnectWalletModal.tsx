@@ -1,10 +1,13 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+"use client";
+
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 
 interface ConnectWalletModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onWalletSelect?: () => void;
 }
 
 const wallets = [
@@ -39,7 +42,12 @@ const wallets = [
   }
 ];
 
-export const ConnectWalletModal = ({ isOpen, onClose }: ConnectWalletModalProps) => {
+export const ConnectWalletModal = ({ isOpen, onClose, onWalletSelect }: ConnectWalletModalProps) => {
+  const handleWalletClick = () => {
+    onClose();
+    onWalletSelect?.();
+  };
+  
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md bg-card border-border">
@@ -55,15 +63,16 @@ export const ConnectWalletModal = ({ isOpen, onClose }: ConnectWalletModalProps)
           </Button>
         </DialogHeader>
         
-        <div className="text-sm text-muted-foreground mb-6">
+        <DialogDescription className="text-sm text-muted-foreground mb-6">
           Connect wallet to make transactions on the dApp
-        </div>
+        </DialogDescription>
         
         <div className="space-y-3">
           {wallets.map((wallet) => (
             <Button
               key={wallet.name}
               variant="ghost"
+              onClick={handleWalletClick}
               className="w-full justify-between h-14 px-4 border border-border hover:bg-accent/50 bg-swap-input"
             >
               <div className="flex items-center space-x-3">

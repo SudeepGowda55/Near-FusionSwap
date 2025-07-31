@@ -1,6 +1,6 @@
 "use client";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X, Search, ChevronLeft } from "lucide-react";
@@ -69,6 +69,10 @@ export const TokenSelectModal = ({ isOpen, onClose, onSelectToken }: TokenSelect
               <DialogTitle className="text-foreground">All networks</DialogTitle>
             </div>
           </DialogHeader>
+          
+          <DialogDescription className="sr-only">
+            Select a network to view available tokens
+          </DialogDescription>
           
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -143,6 +147,10 @@ export const TokenSelectModal = ({ isOpen, onClose, onSelectToken }: TokenSelect
             <X className="h-4 w-4" />
           </Button>
         </DialogHeader>
+        
+        <DialogDescription className="sr-only">
+          Choose a token to swap from the available options
+        </DialogDescription>
         
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />

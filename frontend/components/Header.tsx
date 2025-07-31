@@ -5,7 +5,12 @@ import { ChevronDown, Settings, HelpCircle, Download } from "lucide-react";
 import { useState } from "react";
 import { ConnectWalletModal } from "./ConnectWalletModal";
 
-export const Header = () => {
+interface HeaderProps {
+  isWalletConnected?: boolean;
+  onWalletConnect?: () => void;
+}
+
+export const Header = ({ isWalletConnected = false, onWalletConnect }: HeaderProps) => {
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
 
   return (
@@ -42,7 +47,7 @@ export const Header = () => {
           className="bg-primary hover:bg-primary/90 text-primary-foreground px-6"
           onClick={() => setIsWalletModalOpen(true)}
         >
-          Connect wallet
+          {isWalletConnected ? "Wallet Connected" : "Connect wallet"}
         </Button>
         <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary">
           <HelpCircle className="h-5 w-5" />
@@ -57,7 +62,8 @@ export const Header = () => {
 
       <ConnectWalletModal 
         isOpen={isWalletModalOpen} 
-        onClose={() => setIsWalletModalOpen(false)} 
+        onClose={() => setIsWalletModalOpen(false)}
+        onWalletSelect={onWalletConnect}
       />
     </header>
   );
