@@ -8,6 +8,33 @@ import { useState } from "react";
 import { TokenSelectModal } from "./TokenSelectModal";
 import { TransactionModal } from "./TransactionModal";
 import { ConfirmSwapModal } from "./ConfirmSwapModal";
+import { useWalletClient, useChainId, useSwitchChain } from "wagmi";
+import { polygon } from "wagmi/chains";
+import { ethers } from "ethers";
+import { TokenApprovalService } from "@/utils/tokenApproval";
+
+// Token configuration - Updated for Polygon network
+const TOKEN_CONFIG = {
+  ETH: {
+    address: "0x0000000000000000000000000000000000000000", // ETH doesn't need approval
+    decimals: 18
+  },
+  WETH: {
+    address: "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619", // WETH on Polygon
+    decimals: 18
+  },
+  USDC: {
+    address: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174", // USDC on Polygon
+    decimals: 6
+  },
+  USDS: {
+    address: "0xB0b86a33E6441e4e6e40b4d4e7F9e1F6e5e5e5e5", // Replace with actual USDS address
+    decimals: 18
+  }
+};
+
+// 1inch Router V5 contract address on Polygon
+const ONEINCH_ROUTER = "0x111111125421ca6dc452d289314280a0f8842a65";
 
 interface Token {
   symbol: string;
@@ -24,8 +51,8 @@ interface SwapInterfaceProps {
 
 export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: SwapInterfaceProps) => {
   const [fromToken, setFromToken] = useState<Token>({
-    symbol: "ETH",
-    name: "Ether",
+    symbol: "WETH",
+    name: "Wrapped Ether",
     icon: "🔵",
     balance: "$0",
     networks: 11
@@ -47,6 +74,11 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
   const [isSigningModalOpen, setIsSigningModalOpen] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isCompletedModalOpen, setIsCompletedModalOpen] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
+
+  const { data: walletClient } = useWalletClient();
+  const chainId = useChainId();
+  const { switchChain } = useSwitchChain();
 
   const handleSwapTokens = () => {
     const tempToken = fromToken;
@@ -57,24 +89,149 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
     setToAmount(tempAmount);
   };
 
-  const handlePermitAndSwap = () => {
-    // Show signing modal
-    setIsSigningModalOpen(true);
-    
-    // Simulate signing process
-    setTimeout(() => {
+  const handlePermitAndSwap = async () => {
+    if (!walletClient) {
+      console.error('❌ Wallet not connected');
+      return;
+    }
+
+    try {
+      console.log('🚀 Starting permit and swap process...');
+      console.log('📊 Swap Details:');
+      console.log(`  From: ${fromAmount} ${fromToken.symbol}`);
+      console.log(`  To: ${toAmount} ${toToken.symbol}`);
+      
+      // Check if user is on Polygon network
+      if (chainId !== polygon.id) {
+        console.log('🔄 Switching to Polygon network...');
+        try {
+          await switchChain({ chainId: polygon.id });
+          console.log('✅ Switched to Polygon network');
+        } catch (error) {
+          console.error('❌ Failed to switch network:', error);
+          alert('Please switch to Polygon network manually in your wallet');
+          return;
+        }
+      }
+      
+      // Show the signing modal and set approving state
+      setIsSigningModalOpen(true);
+      setIsApproving(true);
+      
+      console.log('📝 Creating ethers signer from wagmi wallet client...');
+      
+      // Create ethers signer from wagmi wallet client
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      
+      const userAddress = await signer.getAddress();
+      console.log('✅ Ethers signer created successfully');
+      console.log('👤 User address:', userAddress);
+      
+      // Initialize token approval service
+      const approvalService = new TokenApprovalService(signer);
+      console.log('🏭 Token approval service initialized');
+
+      // Get token address from config
+      const tokenAddress = TOKEN_CONFIG[fromToken.symbol as keyof typeof TOKEN_CONFIG]?.address;
+      
+      console.log('🪙 Token details:');
+      console.log('  - Symbol:', fromToken.symbol);
+      console.log('  - Contract Address:', tokenAddress);
+      console.log('  - Amount to swap:', fromAmount);
+      console.log('  - Spender (1inch Router):', ONEINCH_ROUTER);
+      
+      if (!tokenAddress || tokenAddress === "0x0000000000000000000000000000000000000000") {
+        // ETH doesn't need approval, skip to swap confirmation
+        console.log('⚡ ETH detected, skipping approval process');
+        
+        // Add a small delay to show the modal briefly
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        setIsSigningModalOpen(false);
+        setIsConfirmModalOpen(true);
+        setIsApproving(false);
+        return;
+      }
+
+      console.log('🔍 Checking current allowance...');
+      
+      // Check current allowance with error handling
+      let currentAllowance: bigint;
+      let approvalNeeded = true;
+      
+      try {
+        currentAllowance = await approvalService.getCurrentAllowance(tokenAddress, ONEINCH_ROUTER);
+        console.log('📊 Current allowance:', ethers.formatEther(currentAllowance));
+        
+        const requiredAmount = ethers.parseUnits(fromAmount, TOKEN_CONFIG[fromToken.symbol as keyof typeof TOKEN_CONFIG].decimals);
+        console.log('💰 Required amount:', ethers.formatEther(requiredAmount));
+        
+        approvalNeeded = currentAllowance < requiredAmount;
+        console.log('❓ Approval needed:', approvalNeeded);
+      } catch (error) {
+        console.warn('⚠️ Could not check allowance, proceeding with approval anyway:', error);
+        approvalNeeded = true;
+      }
+
+      if (approvalNeeded) {
+        console.log('🔐 Starting token approval process...');
+        console.log('⏳ Please confirm the approval transaction in your wallet...');
+        
+        // Execute unlimited token approval for 1inch Router
+        const approvalResult = await approvalService.approveToken(
+          tokenAddress,
+          ONEINCH_ROUTER,
+          ethers.MaxUint256 // Unlimited approval
+        );
+
+        if (!approvalResult.success) {
+          throw new Error(approvalResult.error || 'Token approval failed');
+        }
+
+        console.log('✅ Token approval completed successfully!');
+        console.log('📜 Transaction hash:', approvalResult.transactionHash);
+        console.log('🎯 Token approved for unlimited spending by 1inch Router');
+      } else {
+        console.log('✅ Sufficient allowance already exists, skipping approval');
+        
+        // Add a small delay to show the modal
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+      
+      console.log('🔄 Moving to swap confirmation...');
+      
+      // Move to confirmation modal
       setIsSigningModalOpen(false);
       setIsConfirmModalOpen(true);
-    }, 3000);
+
+    } catch (error) {
+      console.error('❌ Approval process failed:', error);
+      console.error('📝 Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      
+      setIsSigningModalOpen(false);
+      
+      // Show error to user
+      const errorMessage = error instanceof Error ? error.message : 'Token approval failed';
+      alert(`Approval failed: ${errorMessage}. Please try again.`);
+    } finally {
+      setIsApproving(false);
+      console.log('🏁 Permit and swap process completed');
+    }
   };
 
   const handleConfirmSwap = () => {
+    console.log('🔄 Confirming swap...');
     setIsConfirmModalOpen(false);
     setIsCompletedModalOpen(true);
     
     // Auto close completion modal after 3 seconds
     setTimeout(() => {
       setIsCompletedModalOpen(false);
+      console.log('✅ Swap process completed successfully');
     }, 3000);
   };
 
@@ -182,7 +339,7 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
 
             {/* Exchange rate */}
             <div className="text-sm text-muted-foreground">
-              1 ETH = 3789.41 USDS ~$3 799.4
+              1 {fromToken.symbol} = 3789.41 {toToken.symbol} ~$3 799.4
             </div>
 
             {/* Advanced settings toggle */}
@@ -206,7 +363,7 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Minimum receive</span>
-                  <span className="text-foreground">~$3 864.8 3 867.43928 USDS</span>
+                  <span className="text-foreground">~$3 864.8 3 867.43928 {toToken.symbol}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Network Fee</span>
@@ -218,13 +375,23 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
               </div>
             )}
 
+            {/* Network warning */}
+            {chainId !== polygon.id && (
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
+                <p className="text-yellow-500 text-sm">
+                  ⚠️ Please switch to Polygon network to use this feature
+                </p>
+              </div>
+            )}
+
             {/* Connect wallet / Permit and swap button */}
             {isWalletConnected ? (
               <Button 
                 onClick={handlePermitAndSwap}
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-lg font-medium"
+                disabled={isApproving}
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Permit and swap
+                {isApproving ? 'Approving Token...' : 'Permit and swap'}
               </Button>
             ) : (
               <Button 
@@ -254,8 +421,8 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
       <TransactionModal
         isOpen={isSigningModalOpen}
         onClose={() => setIsSigningModalOpen(false)}
-        title="Please, sign the transaction in your wallet"
-        description=""
+        title={isApproving ? "Approving Token Access..." : "Please sign the transaction in your wallet"}
+        description={isApproving ? `Please confirm the ${fromToken.symbol} approval transaction in your wallet to allow 1inch Router to spend your tokens.` : ""}
         showCloseButton={true}
       />
 
@@ -268,14 +435,14 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
           name: fromToken.name,
           icon: fromToken.icon,
           amount: fromAmount,
-          usdValue: "~$0.00374398"
+          usdValue: "~$3,774.15"
         }}
         toToken={{
           symbol: toToken.symbol,
           name: toToken.name,
           icon: toToken.icon,
           amount: toAmount,
-          usdValue: "~$0.00373131"
+          usdValue: "~$3,799.42"
         }}
       />
 
