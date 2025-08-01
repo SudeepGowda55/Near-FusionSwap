@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as Sdk from '@1inch/cross-chain-sdk';
 import { uint8ArrayToHex, UINT_40_MAX } from '@1inch/byte-utils';
-import { createServer, CreateServerReturnType } from 'prool';
-import { anvil } from 'prool/instances';
 import {
   computeAddress,
   ContractFactory,
@@ -26,7 +24,7 @@ const userPk = '';
 const resolverPk = '';
 
 type Chain = {
-  node?: CreateServerReturnType | undefined;
+  node?: any | undefined;
   provider: JsonRpcProvider;
   escrowFactory: string;
   resolver: string;
@@ -76,7 +74,7 @@ export class PolygonService {
   }
 
   public async initChain(cnf: ChainConfig): Promise<{
-    node?: CreateServerReturnType;
+    node?: any;
     provider: JsonRpcProvider;
     escrowFactory: string;
     resolver: string;
@@ -122,7 +120,7 @@ export class PolygonService {
 
   public async getProvider(
     cnf: ChainConfig,
-  ): Promise<{ node?: CreateServerReturnType; provider: JsonRpcProvider }> {
+  ): Promise<{ node?: any; provider: JsonRpcProvider }> {
     if (!cnf.createFork) {
       return {
         provider: new JsonRpcProvider(cnf.url, cnf.chainId, {
@@ -131,6 +129,12 @@ export class PolygonService {
         }),
       };
     }
+
+    // Dynamic import for ES modules with TypeScript bypass
+    const prool = await eval('import("prool")');
+    const proolInstances = await eval('import("prool/instances")');
+    const { createServer } = prool;
+    const { anvil } = proolInstances;
 
     const node = createServer({
       instance: anvil({ forkUrl: cnf.url, chainId: cnf.chainId }),
