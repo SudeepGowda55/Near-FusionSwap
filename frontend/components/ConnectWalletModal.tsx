@@ -3,6 +3,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
+import { useAccount, useConnect, useDisconnect } from "wagmi";
 
 interface ConnectWalletModalProps {
   isOpen: boolean;
@@ -43,11 +44,32 @@ const wallets = [
 ];
 
 export const ConnectWalletModal = ({ isOpen, onClose, onWalletSelect }: ConnectWalletModalProps) => {
-  const handleWalletClick = () => {
+  const { address } = useAccount();
+  const { connectors, connect } = useConnect();
+  const { disconnect } = useDisconnect();
+
+  const handleWalletClick = (walletName: string) => {
+    if (walletName === "MetaMask") {
+      if (address) {
+        disconnect();
+      } else {
+        // Use the official documentation approach - iterate through connectors
+        connectors.map((connector) => {
+          if (connector.name === "MetaMask" || connector.id === "metaMask") {
+            connect({ connector });
+          }
+        });
+      }
+      onClose();
+      onWalletSelect?.();
+      return;
+    }
+
+    // For other wallets, just close modal
     onClose();
     onWalletSelect?.();
   };
-  
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md bg-card border-border">
@@ -68,30 +90,46 @@ export const ConnectWalletModal = ({ isOpen, onClose, onWalletSelect }: ConnectW
         </DialogDescription>
         
         <div className="space-y-3">
-          {wallets.map((wallet) => (
-            <Button
-              key={wallet.name}
-              variant="ghost"
-              onClick={handleWalletClick}
-              className="w-full justify-between h-14 px-4 border border-border hover:bg-accent/50 bg-swap-input"
-            >
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-lg">
-                  {wallet.icon}
+          {wallets.map((wallet) => {
+            const isMetaMask = wallet.name === "MetaMask";
+            const isConnectedMetaMask = isMetaMask && address;
+
+            return (
+              <Button
+                key={wallet.name}
+                variant="ghost"
+                onClick={() => handleWalletClick(wallet.name)}
+                className="w-full justify-between h-14 px-4 border border-border hover:bg-accent/50 bg-swap-input"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-lg">
+                    {wallet.icon}
+                  </div>
+                  <span className="text-foreground">{wallet.name}</span>
                 </div>
-                <span className="text-foreground">{wallet.name}</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                {wallet.detected && (
-                  <span className="text-xs text-primary">Detected</span>
-                )}
-                {wallet.action === "scan" && (
-                  <span className="text-xs text-muted-foreground">Scan QR code to connect</span>
-                )}
-                <span className="text-muted-foreground">›</span>
-              </div>
-            </Button>
-          ))}
+                
+                <div className="flex items-center space-x-2">
+                  {isConnectedMetaMask && (
+                    <span className="text-xs text-green-500 truncate max-w-[120px]" title={address}>
+                      {address.slice(0, 6)}...{address.slice(-4)}
+                    </span>
+                  )}
+                  
+                  {!isConnectedMetaMask && wallet.detected && (
+                    <span className="text-xs text-primary">Detected</span>
+                  )}
+                  
+                  {wallet.action === "scan" && (
+                    <span className="text-xs text-muted-foreground">Scan QR code to connect</span>
+                  )}
+                  
+                  <span className="text-muted-foreground">
+                    {isConnectedMetaMask ? "Disconnect" : "›"}
+                  </span>
+                </div>
+              </Button>
+            );
+          })}
         </div>
         
         <div className="mt-6 text-center">

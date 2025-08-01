@@ -2,26 +2,16 @@
 
 import { Header } from "@/components/Header";
 import { SwapInterface } from "@/components/SwapInterface";
-import { useState } from "react";
+import { useAccount } from "wagmi";
 
 export default function Home() {
-  const [isWalletConnected, setIsWalletConnected] = useState(false);
-
-  const handleConnectWallet = () => {
-    setIsWalletConnected(true);
-  };
+  const { isConnected } = useAccount();
 
   return (
     <div className="min-h-screen bg-background">
-      <Header 
-        isWalletConnected={isWalletConnected}
-        onWalletConnect={handleConnectWallet}
-      />
+      <Header isWalletConnected={isConnected} onWalletConnect={() => {}} />
       <main className="flex items-center justify-center py-8">
-        <SwapInterface 
-          isWalletConnected={isWalletConnected}
-          onConnectWallet={handleConnectWallet}
-        />
+        <SwapInterface isWalletConnected={isConnected} onConnectWallet={() => {}} />
       </main>
     </div>
   );
