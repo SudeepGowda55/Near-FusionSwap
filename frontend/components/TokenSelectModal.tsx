@@ -35,6 +35,13 @@ const popularTokens = [
 
 const tokens: Token[] = [
   { symbol: "USDT", name: "Tether USD", icon: "🟢", balance: "$0", networks: 13 },
+  {
+    symbol: "NEAR",
+    name: "NEAR Protocol",
+    icon: "🌈",
+    balance: "$0",
+    networks: 1
+  },
   { symbol: "ETH", name: "Ether", icon: "🔵", balance: "$0", networks: 11 },
   { symbol: "BNB", name: "BNB", icon: "🟡", balance: "$0", networks: 3 },
   { symbol: "USDC", name: "USD Coin", icon: "🔵", balance: "$0", networks: 13 },

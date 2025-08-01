@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronDown, ArrowUpDown, RefreshCw, Shuffle } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TokenSelectModal } from "./TokenSelectModal";
 import { TransactionModal } from "./TransactionModal";
 import { ConfirmSwapModal } from "./ConfirmSwapModal";
@@ -12,26 +12,42 @@ import { useWalletClient, useChainId, useSwitchChain } from "wagmi";
 import { polygon } from "wagmi/chains";
 import { ethers } from "ethers";
 import { TokenApprovalService } from "@/utils/tokenApproval";
+import { useTokenPrices } from "@/hooks/useTokenPrices";
+import { priceService } from "@/utils/priceService";
 
 // Token configuration - Updated for Polygon network
+// Updated TOKEN_CONFIG in SwapInterface.tsx
 const TOKEN_CONFIG = {
   ETH: {
-    address: "0x0000000000000000000000000000000000000000", // ETH doesn't need approval
+    address: "0x0000000000000000000000000000000000000000",
     decimals: 18
   },
   WETH: {
-    address: "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619", // WETH on Polygon
+    address: "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619", // Correct WETH
     decimals: 18
   },
   USDC: {
-    address: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174", // USDC on Polygon
+    address: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174", // USDC address
     decimals: 6
   },
-  USDS: {
-    address: "0xB0b86a33E6441e4e6e40b4d4e7F9e1F6e5e5e5e5", // Replace with actual USDS address
+  USDT: {
+    address: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
+    decimals: 6
+  },
+  DAI: {
+    address: "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063",
+    decimals: 18
+  },
+  NEAR: {
+    address: "0x85f17cf997934a597031b2e18a9ab6ebd4b9f6a4", // NEAR bridged token
+    decimals: 24 // NEAR uses 24 decimals
+  },
+  MATIC: {
+    address: "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270", // Native MATIC
     decimals: 18
   }
 };
+
 
 // 1inch Router V5 contract address on Polygon
 const ONEINCH_ROUTER = "0x111111125421ca6dc452d289314280a0f8842a65";
@@ -59,15 +75,15 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
   });
   
   const [toToken, setToToken] = useState<Token>({
-    symbol: "USDS",
-    name: "USDS Stablecoin",
-    icon: "🟢",
+    symbol: "NEAR",
+    name: "NEAR Protocol",
+    icon: "🌈",
     balance: "$0",
     networks: 1
   });
   
   const [fromAmount, setFromAmount] = useState("1");
-  const [toAmount, setToAmount] = useState("3789.41481");
+  const [toAmount, setToAmount] = useState("0");
   const [isFromTokenModalOpen, setIsFromTokenModalOpen] = useState(false);
   const [isToTokenModalOpen, setIsToTokenModalOpen] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -79,6 +95,29 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
   const { data: walletClient } = useWalletClient();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
+
+  // Use price hook for both tokens
+  const { 
+    loading: pricesLoading, 
+    error: priceError,
+    getTokenPrice, 
+    calculateUSDValue,
+    refetch: refetchPrices 
+  } = useTokenPrices([fromToken.symbol, toToken.symbol, "NEAR"]);
+
+  // Calculate exchange rate and amounts when prices or amounts change
+  useEffect(() => {
+    if (fromAmount && parseFloat(fromAmount) > 0) {
+      const fromPrice = getTokenPrice(fromToken.symbol);
+      const toPrice = getTokenPrice(toToken.symbol);
+      
+      if (parseFloat(fromPrice) > 0 && parseFloat(toPrice) > 0) {
+        const fromValueUSD = parseFloat(fromAmount) * parseFloat(fromPrice);
+        const calculatedToAmount = fromValueUSD / parseFloat(toPrice);
+        setToAmount(calculatedToAmount.toFixed(6));
+      }
+    }
+  }, [fromAmount, fromToken.symbol, toToken.symbol, getTokenPrice]);
 
   const handleSwapTokens = () => {
     const tempToken = fromToken;
@@ -235,6 +274,12 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
     }, 3000);
   };
 
+  // Calculate USD values using real prices
+  const fromUSDValue = calculateUSDValue(fromAmount, fromToken.symbol);
+  const toUSDValue = calculateUSDValue(toAmount, toToken.symbol);
+  const fromPrice = getTokenPrice(fromToken.symbol);
+  const toPrice = getTokenPrice(toToken.symbol);
+
   return (
     <div className="max-w-md mx-auto p-4">
       <Card className="bg-swap-card border-border">
@@ -253,14 +298,29 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
               </Button>
             </div>
             <div className="flex items-center space-x-2">
-              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-                <RefreshCw className="h-4 w-4" />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="text-muted-foreground hover:text-foreground"
+                onClick={refetchPrices}
+                disabled={pricesLoading}
+              >
+                <RefreshCw className={`h-4 w-4 ${pricesLoading ? 'animate-spin' : ''}`} />
               </Button>
               <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
                 <Shuffle className="h-4 w-4" />
               </Button>
             </div>
           </div>
+
+          {/* Price error banner */}
+          {priceError && (
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 mb-4">
+              <p className="text-yellow-500 text-sm">
+                ⚠️ Unable to fetch latest prices: {priceError}
+              </p>
+            </div>
+          )}
 
           {/* You pay */}
           <div className="space-y-4">
@@ -287,9 +347,11 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">
-                  {fromToken.name}
+                  {fromToken.name} {priceService.formatPrice(fromPrice)}
                 </span>
-                <span className="text-muted-foreground">~$3 774.15</span>
+                <span className="text-muted-foreground">
+                  {pricesLoading ? 'Loading...' : `~$${fromUSDValue}`}
+                </span>
               </div>
             </div>
 
@@ -326,20 +388,27 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
                     onChange={(e) => setToAmount(e.target.value)}
                     className="text-right text-2xl font-semibold bg-transparent border-none p-0 h-auto text-foreground"
                     placeholder="0"
+                    readOnly
                   />
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">
-                    {toToken.name}
+                    {toToken.name} {priceService.formatPrice(toPrice)}
                   </span>
-                  <span className="text-muted-foreground">~$3 799.42</span>
+                  <span className="text-muted-foreground">
+                    {pricesLoading ? 'Loading...' : `~$${toUSDValue}`}
+                  </span>
                 </div>
               </div>
             </div>
 
             {/* Exchange rate */}
             <div className="text-sm text-muted-foreground">
-              1 {fromToken.symbol} = 3789.41 {toToken.symbol} ~$3 799.4
+              {parseFloat(fromPrice) > 0 && parseFloat(toPrice) > 0 ? (
+                `1 ${fromToken.symbol} = ${(parseFloat(fromPrice) / parseFloat(toPrice)).toFixed(6)} ${toToken.symbol}`
+              ) : (
+                'Loading exchange rate...'
+              )}
             </div>
 
             {/* Advanced settings toggle */}
@@ -363,13 +432,15 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Minimum receive</span>
-                  <span className="text-foreground">~$3 864.8 3 867.43928 {toToken.symbol}</span>
+                  <span className="text-foreground">
+                    {(parseFloat(toAmount) * 0.995).toFixed(6)} {toToken.symbol}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Network Fee</span>
                   <div className="flex items-center space-x-1">
                     <span className="text-primary text-xs">🔥 Free</span>
-                    <span className="text-muted-foreground">$8.13</span>
+                    <span className="text-muted-foreground">~$0.10</span>
                   </div>
                 </div>
               </div>
@@ -388,7 +459,7 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
             {isWalletConnected ? (
               <Button 
                 onClick={handlePermitAndSwap}
-                disabled={isApproving}
+                disabled={isApproving || pricesLoading}
                 className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isApproving ? 'Approving Token...' : 'Permit and swap'}
@@ -435,14 +506,14 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
           name: fromToken.name,
           icon: fromToken.icon,
           amount: fromAmount,
-          usdValue: "~$3,774.15"
+          usdValue: `~$${fromUSDValue}`
         }}
         toToken={{
           symbol: toToken.symbol,
           name: toToken.name,
           icon: toToken.icon,
           amount: toAmount,
-          usdValue: "~$3,799.42"
+          usdValue: `~$${toUSDValue}`
         }}
       />
 
