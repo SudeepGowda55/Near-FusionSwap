@@ -8,6 +8,8 @@ const fromEnv = {
   POLYGON_CHAIN_RPC:
     'https://polygon-mainnet.g.alchemy.com/v2/wUelP0gIjMqLBYKKjGGvd8DvPC7UH8bw',
   POLYGON_CHAIN_CREATE_FORK: true,
+  NEAR_CHAIN_RPC: 'https://near-testnet.api.pagoda.co/rpc/v1/',
+  NEAR_CHAIN_CREATE_FORK: false,
 };
 
 export const config = {
@@ -59,6 +61,8 @@ export const config = {
     },
     near: {
       chainId: NetworkEnum.ETHEREUM,
+      url: fromEnv.NEAR_CHAIN_RPC,
+      createFork: fromEnv.NEAR_CHAIN_CREATE_FORK,
     },
   },
 } as const;
