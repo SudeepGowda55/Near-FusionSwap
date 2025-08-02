@@ -16,7 +16,6 @@ import { useTokenPrices } from "@/hooks/useTokenPrices";
 import { priceService } from "@/utils/priceService";
 
 // Token configuration - Updated for Polygon network
-// Updated TOKEN_CONFIG in SwapInterface.tsx
 const TOKEN_CONFIG = {
   ETH: {
     address: "0x0000000000000000000000000000000000000000",
@@ -47,7 +46,6 @@ const TOKEN_CONFIG = {
     decimals: 18
   }
 };
-
 
 // 1inch Router V5 contract address on Polygon
 const ONEINCH_ROUTER = "0x111111125421ca6dc452d289314280a0f8842a65";
@@ -96,6 +94,14 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
 
+  // Debug chain detection
+  console.log('🔗 Chain detection:', {
+    chainId,
+    isWalletConnected,
+    polygonId: polygon.id,
+    isPolygon: chainId === polygon.id
+  });
+
   // Use price hook for both tokens
   const { 
     loading: pricesLoading, 
@@ -103,7 +109,7 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
     getTokenPrice, 
     calculateUSDValue,
     refetch: refetchPrices 
-  } = useTokenPrices([fromToken.symbol, toToken.symbol, "NEAR"]);
+  } = useTokenPrices([fromToken.symbol, toToken.symbol, "NEAR", "WETH"]);
 
   // Calculate exchange rate and amounts when prices or amounts change
   useEffect(() => {
@@ -119,13 +125,67 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
     }
   }, [fromAmount, fromToken.symbol, toToken.symbol, getTokenPrice]);
 
+  // Enhanced swap tokens function that properly handles bidirectional swaps
   const handleSwapTokens = () => {
+    console.log('🔄 Swapping tokens...');
+    console.log('📊 Before swap:');
+    console.log(`  From: ${fromAmount} ${fromToken.symbol}`);
+    console.log(`  To: ${toAmount} ${toToken.symbol}`);
+    
     const tempToken = fromToken;
     const tempAmount = fromAmount;
+    
     setFromToken(toToken);
     setToToken(tempToken);
     setFromAmount(toAmount);
     setToAmount(tempAmount);
+    
+    console.log('📊 After swap:');
+    console.log(`  From: ${toAmount} ${toToken.symbol}`);
+    console.log(`  To: ${tempAmount} ${tempToken.symbol}`);
+  };
+
+  // Enhanced token selection that ensures both WETH and NEAR are available
+  const handleFromTokenSelect = (token: Token) => {
+    console.log('🎯 Selected from token:', token.symbol);
+    setFromToken(token);
+    
+    // If the same token is selected for both, swap the "to" token
+    if (token.symbol === toToken.symbol) {
+      const availableTokens = [
+        { symbol: "WETH", name: "Wrapped Ether", icon: "🔵", balance: "$0", networks: 11 },
+        { symbol: "NEAR", name: "NEAR Protocol", icon: "🌈", balance: "$0", networks: 1 },
+        { symbol: "USDC", name: "USD Coin", icon: "🔵", balance: "$0", networks: 13 },
+        { symbol: "USDT", name: "Tether USD", icon: "🟢", balance: "$0", networks: 13 }
+      ];
+      
+      const otherToken = availableTokens.find(t => t.symbol !== token.symbol);
+      if (otherToken) {
+        setToToken(otherToken);
+        console.log('🔄 Auto-swapped to token to:', otherToken.symbol);
+      }
+    }
+  };
+
+  const handleToTokenSelect = (token: Token) => {
+    console.log('🎯 Selected to token:', token.symbol);
+    setToToken(token);
+    
+    // If the same token is selected for both, swap the "from" token
+    if (token.symbol === fromToken.symbol) {
+      const availableTokens = [
+        { symbol: "WETH", name: "Wrapped Ether", icon: "🔵", balance: "$0", networks: 11 },
+        { symbol: "NEAR", name: "NEAR Protocol", icon: "🌈", balance: "$0", networks: 1 },
+        { symbol: "USDC", name: "USD Coin", icon: "🔵", balance: "$0", networks: 13 },
+        { symbol: "USDT", name: "Tether USD", icon: "🟢", balance: "$0", networks: 13 }
+      ];
+      
+      const otherToken = availableTokens.find(t => t.symbol !== token.symbol);
+      if (otherToken) {
+        setFromToken(otherToken);
+        console.log('🔄 Auto-swapped from token to:', otherToken.symbol);
+      }
+    }
   };
 
   const handlePermitAndSwap = async () => {
@@ -139,6 +199,7 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
       console.log('📊 Swap Details:');
       console.log(`  From: ${fromAmount} ${fromToken.symbol}`);
       console.log(`  To: ${toAmount} ${toToken.symbol}`);
+      console.log(`  Direction: ${fromToken.symbol} → ${toToken.symbol}`);
       
       // Check if user is on Polygon network
       if (chainId !== polygon.id) {
@@ -166,12 +227,26 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
       const userAddress = await signer.getAddress();
       console.log('✅ Ethers signer created successfully');
       console.log('👤 User address:', userAddress);
+
+      // Handle NEAR tokens differently - they don't need ERC-20 approval
+      if (fromToken.symbol === 'NEAR') {
+        console.log('🌈 NEAR token detected - skipping ERC-20 approval process');
+        console.log('📝 NEAR tokens are handled differently in cross-chain swaps');
+        
+        // Add a small delay to show the modal briefly
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        setIsSigningModalOpen(false);
+        setIsConfirmModalOpen(true);
+        setIsApproving(false);
+        return;
+      }
       
-      // Initialize token approval service
+      // Initialize token approval service for ERC-20 tokens
       const approvalService = new TokenApprovalService(signer);
       console.log('🏭 Token approval service initialized');
 
-      // Get token address from config
+      // Get token address from config - only for ERC-20 tokens
       const tokenAddress = TOKEN_CONFIG[fromToken.symbol as keyof typeof TOKEN_CONFIG]?.address;
       
       console.log('🪙 Token details:');
@@ -264,6 +339,7 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
 
   const handleConfirmSwap = () => {
     console.log('🔄 Confirming swap...');
+    console.log(`📊 Final swap: ${fromAmount} ${fromToken.symbol} → ${toAmount} ${toToken.symbol}`);
     setIsConfirmModalOpen(false);
     setIsCompletedModalOpen(true);
     
@@ -362,6 +438,7 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
                 size="icon"
                 onClick={handleSwapTokens}
                 className="rounded-full bg-swap-input hover:bg-accent border border-border w-10 h-10"
+                title="Swap tokens"
               >
                 <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
               </Button>
@@ -447,7 +524,7 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
             )}
 
             {/* Network warning */}
-            {chainId !== polygon.id && (
+            {isWalletConnected && chainId !== polygon.id && (
               <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
                 <p className="text-yellow-500 text-sm">
                   ⚠️ Please switch to Polygon network to use this feature
@@ -462,7 +539,10 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
                 disabled={isApproving || pricesLoading}
                 className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isApproving ? 'Approving Token...' : 'Permit and swap'}
+                {isApproving 
+                  ? (fromToken.symbol === 'NEAR' ? 'Processing NEAR Swap...' : 'Approving Token...')
+                  : (fromToken.symbol === 'NEAR' ? 'Swap NEAR' : 'Permit and swap')
+                }
               </Button>
             ) : (
               <Button 
@@ -480,12 +560,12 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
       <TokenSelectModal
         isOpen={isFromTokenModalOpen}
         onClose={() => setIsFromTokenModalOpen(false)}
-        onSelectToken={(token) => setFromToken(token)}
+        onSelectToken={handleFromTokenSelect}
       />
       <TokenSelectModal
         isOpen={isToTokenModalOpen}
         onClose={() => setIsToTokenModalOpen(false)}
-        onSelectToken={(token) => setToToken(token)}
+        onSelectToken={handleToTokenSelect}
       />
 
       {/* Transaction modals */}
@@ -493,7 +573,13 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
         isOpen={isSigningModalOpen}
         onClose={() => setIsSigningModalOpen(false)}
         title={isApproving ? "Approving Token Access..." : "Please sign the transaction in your wallet"}
-        description={isApproving ? `Please confirm the ${fromToken.symbol} approval transaction in your wallet to allow 1inch Router to spend your tokens.` : ""}
+        description={
+          isApproving 
+            ? fromToken.symbol === 'NEAR' 
+              ? `Please confirm the NEAR cross-chain swap transaction in your wallet. NEAR tokens are handled differently in cross-chain swaps.`
+              : `Please confirm the ${fromToken.symbol} approval transaction in your wallet to allow 1inch Router to spend your tokens.`
+            : ""
+        }
         showCloseButton={true}
       />
 

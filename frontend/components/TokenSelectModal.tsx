@@ -22,11 +22,12 @@ interface Token {
 }
 
 const popularTokens = [
-  { symbol: "ETH", icon: "🔵", name: "Ethereum" },
-  { symbol: "SOL", icon: "⚪", name: "Solana" },
+  { symbol: "WETH", icon: "🔵", name: "Wrapped Ethereum" },
+  { symbol: "NEAR", icon: "🌈", name: "NEAR Protocol" },
   { symbol: "USDC", icon: "🔵", name: "USD Coin" },
   { symbol: "USDT", icon: "🟢", name: "Tether USD" },
-  { symbol: "WETH", icon: "🔵", name: "Wrapped Ethereum" },
+  { symbol: "ETH", icon: "🔵", name: "Ethereum" },
+  { symbol: "SOL", icon: "⚪", name: "Solana" },
   { symbol: "UNI", icon: "🦄", name: "Uniswap" },
   { symbol: "WBTC", icon: "🟡", name: "Wrapped Bitcoin" },
   { symbol: "BNB", icon: "🟡", name: "BNB" },
@@ -34,7 +35,13 @@ const popularTokens = [
 ];
 
 const tokens: Token[] = [
-  { symbol: "USDT", name: "Tether USD", icon: "🟢", balance: "$0", networks: 13 },
+  {
+    symbol: "WETH",
+    name: "Wrapped Ethereum",
+    icon: "🔵",
+    balance: "$0",
+    networks: 11
+  },
   {
     symbol: "NEAR",
     name: "NEAR Protocol",
@@ -42,6 +49,7 @@ const tokens: Token[] = [
     balance: "$0",
     networks: 1
   },
+  { symbol: "USDT", name: "Tether USD", icon: "🟢", balance: "$0", networks: 13 },
   { symbol: "ETH", name: "Ether", icon: "🔵", balance: "$0", networks: 11 },
   { symbol: "BNB", name: "BNB", icon: "🟡", balance: "$0", networks: 3 },
   { symbol: "USDC", name: "USD Coin", icon: "🔵", balance: "$0", networks: 13 },

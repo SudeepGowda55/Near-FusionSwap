@@ -101,7 +101,9 @@ export const useTokenPrices = (tokenSymbols: string[] = []): UseTokenPricesResul
       return '0.00';
     }
     
-    return prices[address] || '0.00';
+    const price = prices[address] || '0.00';
+    console.log(`💰 Price for ${tokenSymbol} (${address}): $${price}`);
+    return price;
   }, [prices, chainId]);
 
   const calculateUSDValue = useCallback((amount: string, tokenSymbol: string): string => {
