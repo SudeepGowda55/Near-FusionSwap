@@ -133,3 +133,9 @@ dist
 
 cache
 .idea
+
+# Rust / Cargo
+target/
+
+# NEAR
+neardev/
