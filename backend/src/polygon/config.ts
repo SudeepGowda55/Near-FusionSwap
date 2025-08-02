@@ -48,11 +48,12 @@ export const config = {
       createFork: fromEnv.POLYGON_CHAIN_CREATE_FORK,
       limitOrderProtocol: '0x111111125421ca6dc452d289314280a0f8842a65',
       wrappedNative: '0x7ceb23fd6bc0add59e62ac25578270cff1b9f619',
-      ownerPrivateKey: '',
+      ownerPrivateKey:
+        '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
       tokens: {
         WETH: {
           address: '0x7ceb23fd6bc0add59e62ac25578270cff1b9f619',
-          donor: '0x4188663a85C92EEa35b5AD3AA5cA7CeB237C6fe9',
+          donor: '0x77ed0fef5e9DFB34e776adb11c29dd19d382745C',
         },
       },
     },

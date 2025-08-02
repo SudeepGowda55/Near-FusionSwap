@@ -1,7 +1,7 @@
 import { Interface, Signature, TransactionRequest } from 'ethers';
 import * as Sdk from '@1inch/cross-chain-sdk';
 import { Address } from '@1inch/fusion-sdk';
-import Contract from './polygon/contracts/Resolver.sol/Resolver.json';
+import Contract from './contracts/Resolver.sol/Resolver.json';
 
 export class Resolver {
   private readonly iface = new Interface(Contract.abi);
@@ -49,15 +49,11 @@ export class Resolver {
      */
     immutables: Sdk.Immutables,
   ): TransactionRequest {
-    // Create a temporary immutable with deployed timestamp to get the time locks
-    const deployedAt = BigInt(Math.floor(Date.now() / 1000));
-    const tempImmutable = immutables.withDeployedAt(deployedAt);
-
     return {
       to: this.dstAddress,
       data: this.iface.encodeFunctionData('deployDst', [
         immutables.build(),
-        immutables.timeLocks.toSrcTimeLocks(deployedAt).privateCancellation,
+        immutables.timeLocks.toSrcTimeLocks().privateCancellation,
       ]),
       value: immutables.safetyDeposit,
     };

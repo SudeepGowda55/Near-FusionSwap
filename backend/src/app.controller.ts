@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body } from '@nestjs/common';
 import { PolygonService } from './polygon.service';
 import { NearService } from './near.service';
 import { OrderService } from './order.service';
-import { SwapDto } from './swap.dto';
+import { CreateOrderDto } from './dto/order.dto';
 
 @Controller()
 export class AppController {
@@ -18,71 +18,83 @@ export class AppController {
   }
 
   @Post('polygon-to-near')
-  public async swapPolygonToNear(@Body() swapDto: SwapDto) {
-    console.log('Received swap request:', swapDto);
-    
+  public async swapPolygonToNear(@Body() createOrderDto: CreateOrderDto) {
     try {
-      const order = await this.orderService.createOrder();
-      console.log('Order created:', order);
+      // MANDATORY: Approve the token transfer before creating an order
+      await this.polygonService.initialize();
 
-      const immutables = await this.polygonService.deploySrcEscrow();
-      console.log('Polygon src escrow deployed:', immutables);
+      const { order, orderHash, signature, orderBuild } =
+        await this.orderService.createOrder(
+          createOrderDto,
+          this.polygonService.src.escrowFactory,
+          this.polygonService.src.resolver,
+        );
+      console.log('Order created:', orderBuild);
+
+      const srcEscrowEvent = await this.polygonService.deploySrcEscrow(
+        order,
+        orderHash,
+        signature,
+      );
+      console.log('Polygon src escrow deployed:', srcEscrowEvent);
 
       const details = await this.nearService.deployDestEscrow();
       console.log('NEAR dest escrow deployed:', details);
 
-      const secret = await this.orderService.getOrderSecret();
-      console.log('Order secret generated:', secret);
+      // TODO add function to validate balances
+      const secret = this.orderService.getOrderSecret();
 
-      const srcWithdraw = await this.polygonService.srcEscrowWithdraw();
-      console.log('Polygon src withdraw:', srcWithdraw);
+      await this.polygonService.srcEscrowWithdraw(srcEscrowEvent, secret);
+      console.log('Polygon src withdraw completed');
 
-      const destWithdraw = await this.nearService.destEscrowWithdraw();
-      console.log('NEAR dest withdraw:', destWithdraw);
+      await this.nearService.destEscrowWithdraw();
+      console.log('NEAR dest withdraw completed');
 
       return {
         success: true,
-        message: 'Swap from Polygon to NEAR initiated successfully',
+        message: 'Swap from Polygon to NEAR successfully',
         data: {
           order,
-          immutables,
-          details,
           secret,
-          srcWithdraw,
-          destWithdraw
-        }
+        },
       };
     } catch (error) {
       console.error('Error processing swap:', error);
       return {
         success: false,
         message: 'Error processing swap',
-        error: error.message
+        error: error.message,
       };
     }
   }
 
   @Post('near-to-polygon')
-  public async swapNearToPolygon(@Body() swapDto: SwapDto) {
-    console.log('Received swap request:', swapDto);
-    
+  public async swapNearToPolygon(@Body() createOrderDto: CreateOrderDto) {
     try {
-      const order = await this.orderService.createOrder();
+      const { order, orderHash, signature, orderBuild } =
+        await this.orderService.createOrder(createOrderDto, null, null);
       console.log('Order created:', order);
 
-      const immutables = await this.nearService.deploySrcEscrow();
-      console.log('NEAR src escrow deployed:', immutables);
+      const srcEscrowEvent = await this.nearService.deploySrcEscrow();
+      console.log('NEAR src escrow deployed:', srcEscrowEvent);
 
-      const details = await this.polygonService.deployDestEscrow();
-      console.log('Polygon dest escrow deployed:', details);
+      // const details = await this.polygonService.deployDestEscrow(
+      //   order,
+      //   orderHash,
+      //   signature,
+      // );
+      // console.log('Polygon dest escrow deployed:', details);
 
       const secret = await this.orderService.getOrderSecret();
-      console.log('Order secret generated:', secret);
 
       const srcWithdraw = await this.nearService.srcEscrowWithdraw();
       console.log('NEAR src withdraw:', srcWithdraw);
 
-      const destWithdraw = await this.polygonService.destEscrowWithdraw();
+      const destWithdraw = await this.polygonService.destEscrowWithdraw(
+        null,
+        secret,
+        null,
+      );
       console.log('Polygon dest withdraw:', destWithdraw);
 
       return {
@@ -90,19 +102,17 @@ export class AppController {
         message: 'Swap from NEAR to Polygon initiated successfully',
         data: {
           order,
-          immutables,
-          details,
           secret,
           srcWithdraw,
-          destWithdraw
-        }
+          destWithdraw,
+        },
       };
     } catch (error) {
       console.error('Error processing swap:', error);
       return {
         success: false,
         message: 'Error processing swap',
-        error: error.message
+        error: error.message,
       };
     }
   }
