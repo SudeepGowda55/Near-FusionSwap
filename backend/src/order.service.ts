@@ -20,6 +20,7 @@ export class OrderService {
     order: Sdk.CrossChainOrder;
     orderHash: string;
     signature: string;
+    hashLock: string;
     orderBuild: LimitOrderV4Struct;
   }> {
     const secret = this.getOrderSecret();
@@ -100,11 +101,13 @@ export class OrderService {
       order,
     );
     const orderHash = order.getOrderHash(createOrderdto.srcChainId);
+    const hashLock = order.escrowExtension.hashLockInfo;
 
     return {
       order,
       orderHash,
       signature,
+      hashLock: hashLock.toString(),
       orderBuild: order.build(),
     };
   }

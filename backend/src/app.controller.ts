@@ -23,7 +23,7 @@ export class AppController {
       // MANDATORY: Approve the token transfer before creating an order
       await this.polygonService.initialize();
 
-      const { order, orderHash, signature, orderBuild } =
+      const { order, orderHash, signature, hashLock, orderBuild } =
         await this.orderService.createOrder(
           createOrderDto,
           this.polygonService.src.escrowFactory,
@@ -36,7 +36,6 @@ export class AppController {
         orderHash,
         signature,
       );
-      console.log('Polygon src escrow deployed:', srcEscrowEvent);
 
       const details = await this.nearService.deployDestEscrow();
       console.log('NEAR dest escrow deployed:', details);
