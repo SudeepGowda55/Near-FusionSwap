@@ -8,7 +8,7 @@ const fromEnv = {
   DST_CHAIN_CREATE_FORK: true,
   POLYGON_CHAIN_RPC:
     'https://polygon-mainnet.g.alchemy.com/v2/wUelP0gIjMqLBYKKjGGvd8DvPC7UH8bw',
-  POLYGON_CHAIN_CREATE_FORK: true,
+  POLYGON_CHAIN_CREATE_FORK: false,
   NEAR_CHAIN_RPC: 'https://near-testnet.api.pagoda.co/rpc/v1/',
   NEAR_CHAIN_CREATE_FORK: false,
 };
