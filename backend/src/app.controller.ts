@@ -97,7 +97,7 @@ export class AppController {
 
       console.log('🔐 Generating secret and hash lock...');
       const secret = this.orderService.getOrderSecret();
-      
+
       // Generate keccak256 hash of the secret as required for cross-chain compatibility
       const { keccak256 } = await import('ethers');
       const hashLock = keccak256(secret);
@@ -125,11 +125,16 @@ export class AppController {
 
       console.log('🔍 Order details:', {
         createOrderDto: createOrderDto,
-        hashLock: hashLock
+        hashLock: hashLock,
       });
 
-      console.log('⏭️ Skipping Polygon destination escrow deployment (resolver has no funds)');
-      console.log('🧪 Testing NEAR side only...');
+      const {
+        newDstImmutables,
+        newDstImmutablesComplement,
+        dstDeployedAt,
+        dstEscrowAddress,
+      } = await this.polygonService.deployDestEscrow(order, hashLock);
+      console.log('Polygon dest escrow deployed');
 
       console.log('Waiting for 10 seconds before withdrawing funds...');
       await new Promise((resolve) => setTimeout(resolve, 10000));
@@ -138,11 +143,23 @@ export class AppController {
       // User withdraws their own NEAR tokens from source escrow (they are the resolver in this HTLC)
       const srcWithdraw = await this.nearService.srcEscrowWithdraw(
         nearSrcEscrow.htlc_id,
-        secret
+        secret,
+      );
+
+      console.log('NEAR src withdraw completed:', srcWithdraw);
+
+      await this.polygonService.destEscrowWithdraw(
+        newDstImmutables,
+        newDstImmutablesComplement,
+        secret,
+        dstDeployedAt,
+        dstEscrowAddress,
       );
       console.log('✅ NEAR src withdraw completed:', srcWithdraw);
 
-      console.log('⏭️ Skipping Polygon destination withdrawal (no dest escrow deployed)');
+      console.log(
+        '⏭️ Skipping Polygon destination withdrawal (no dest escrow deployed)',
+      );
       console.log('🎉 NEAR to Polygon swap completed successfully!');
 
       return {
