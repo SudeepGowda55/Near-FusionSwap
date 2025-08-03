@@ -1,4 +1,4 @@
-# Near-FusionSwap
+# Near-FusionSwap 
 
 A cross-chain decentralized exchange (DEX) enabling seamless cross chain token swaps between Polygon Mainnet and NEAR Protocol using Hash Time Locked Contracts (HTLCs) and the 1inch Fusion+ cross-chain infrastructure.
 
