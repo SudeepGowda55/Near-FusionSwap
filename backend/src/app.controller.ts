@@ -106,10 +106,16 @@ export class AppController {
       console.log('🏗️ Phase 2: User creating HTLC on NEAR (source chain)...');
       // Phase 2: User (goldrogerswap.testnet) creates HTLC on NEAR as source
       // User funds the HTLC with NEAR tokens and sets is_destination = false
+      
+      // Convert amount to yoctoNEAR (1 NEAR = 10^24 yoctoNEAR)
+      const { parseUnits } = await import('ethers');
+      const nearAmountInYocto = parseUnits(createOrderDto.takingAmount.toString(), 24);
+      console.log('💰 Amount in yoctoNEAR:', nearAmountInYocto.toString());
+      
       const nearSrcEscrow = await this.nearService.deploySrcEscrow(
         'goldrogerswap.testnet', // user (maker)
         'htlc.testnet', // resolver
-        createOrderDto.takingAmount.toString(), // amount to deposit (NEAR tokens)
+        nearAmountInYocto.toString(), // amount in yoctoNEAR
         hashLock // Use the keccak256 hash
       );
       console.log('✅ NEAR src escrow deployed by user:', nearSrcEscrow);
