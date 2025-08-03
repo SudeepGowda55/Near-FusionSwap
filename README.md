@@ -202,7 +202,6 @@ PRIVATE_KEY=your_private_key_here
 
 The application supports:
 - **Polygon Mainnet** (Chain ID: 137)
-- **NEAR Testnet** (for development)
 - **NEAR Mainnet** (for production)
 
 ## Usage
