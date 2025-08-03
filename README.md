@@ -71,7 +71,15 @@ When users want to swap tokens **FROM NEAR TO Polygon**:
 - **User Account**: `goldrogerswap.testnet` (wants Polygon tokens)
 - **Resolver Account**: `htlc.testnet` (facilitates the swap)
 
-<img width="1398" height="865" alt="Screenshot 2025-08-03 at 9 56 59 PM" src="https://github.com/user-attachments/assets/a4fa4472-7efb-447a-a05a-d575af7fe4cb" />
+
+<img width="1440" height="864" alt="Screenshot 2025-08-03 at 11 48 24 PM" src="https://github.com/user-attachments/assets/dad742bb-7372-40fa-b4d8-687790d6d493" />
+
+<br/>
+<br/>
+<br/>
+
+
+<img width="1032" height="747" alt="Screenshot 2025-08-03 at 9 57 18 PM" src="https://github.com/user-attachments/assets/4392fe0c-0d23-4c75-846d-f32d16a369de" />
 
 
 **Detailed Process Flow:**
@@ -80,6 +88,10 @@ When users want to swap tokens **FROM NEAR TO Polygon**:
 3. **Secret Reveal**: Resolver reveals the secret hash to claim NEAR tokens from the HTLC
 4. **Cross-Chain Claim**: Using the revealed secret, User claims ETH/USDC tokens from the Polygon HTLC
 5. **Completion**: Atomic swap completed - Resolver receives NEAR, User receives Polygon tokens
+
+
+<img width="1142" height="857" alt="Screenshot 2025-08-03 at 9 56 45 PM" src="https://github.com/user-attachments/assets/9628a8a6-64ca-4bbc-90f9-e53165a16d11" />
+
 
 #### Security Features
 - **Time Locks**: All HTLCs have expiration times for automatic refunds if swaps fail
