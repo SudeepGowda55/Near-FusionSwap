@@ -20,25 +20,36 @@ export class AppController {
   @Post('polygon-to-near')
   public async swapPolygonToNear(@Body() createOrderDto: CreateOrderDto) {
     try {
+      console.log('🚀 Starting Polygon to NEAR swap...');
+
       // MANDATORY: Approve the token transfer before creating an order
       await this.polygonService.initialize();
 
+      console.log('📝 Creating order on Polygon...');
       const { order, orderHash, signature, hashLock, orderBuild } =
         await this.orderService.createOrder(
           createOrderDto,
           this.polygonService.src.escrowFactory,
           this.polygonService.src.resolver,
         );
-      console.log('Order created:', orderBuild);
+      console.log('✅ Order created:', orderBuild);
 
+      console.log('🏗️ Deploying source escrow on Polygon...');
       const srcEscrowEvent = await this.polygonService.deploySrcEscrow(
         order,
         orderHash,
         signature,
       );
+      console.log('✅ Polygon src escrow deployed');
 
-      const details = await this.nearService.deployDestEscrow();
-      console.log('NEAR dest escrow deployed:', details);
+      console.log('🏗️ Deploying destination escrow on NEAR...');
+      const nearDestEscrow = await this.nearService.deployDestEscrow(
+        'htlc.testnet', // resolver
+        createOrderDto.makerNearAccountId, // maker
+        createOrderDto.takingAmount, // amount
+        hashLock, // hashLock from order
+      );
+      console.log('✅ NEAR dest escrow deployed:', nearDestEscrow);
 
       // TODO add function to validate balances
       const secret = this.orderService.getOrderSecret();
@@ -46,11 +57,17 @@ export class AppController {
       console.log('Waiting for 10 seconds before withdrawing funds...');
       await new Promise((resolve) => setTimeout(resolve, 10000));
 
+      console.log('💰 Withdrawing from Polygon source escrow...');
       await this.polygonService.srcEscrowWithdraw(srcEscrowEvent, secret);
-      console.log('Polygon src withdraw completed');
+      console.log('✅ Polygon src withdraw completed:');
 
-      await this.nearService.destEscrowWithdraw();
-      console.log('NEAR dest withdraw completed');
+      console.log('💰 Withdrawing from NEAR destination escrow...');
+      const nearWithdraw = await this.nearService.destEscrowWithdraw(
+        nearDestEscrow.htlc_id,
+        secret,
+      );
+      console.log('✅ NEAR dest withdraw completed:', nearWithdraw);
+      console.log('🎉 Polygon to NEAR swap completed successfully!');
 
       return {
         success: true,
@@ -98,12 +115,12 @@ export class AppController {
       const srcWithdraw = await this.nearService.srcEscrowWithdraw();
       console.log('NEAR src withdraw:', srcWithdraw);
 
-      // await this.polygonService.destEscrowWithdraw(
-      //   newDstImmutables,
-      //   newDstImmutablesComplement,
-      //   secret,
-      //   dstDeployedAt,
-      // );
+      await this.polygonService.destEscrowWithdraw(
+        newDstImmutables,
+        newDstImmutablesComplement,
+        secret,
+        dstDeployedAt,
+      );
 
       return {
         success: true,
