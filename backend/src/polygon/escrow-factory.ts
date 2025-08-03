@@ -67,4 +67,23 @@ export class EscrowFactory {
       }),
     ];
   }
+
+  public async getDstDeployEvent(blockHash: string): Promise<string> {
+    const event = this.iface.getEvent('DstEscrowCreated')!;
+    const logs = await this.provider.getLogs({
+      blockHash,
+      address: this.address,
+      topics: [event.topicHash],
+    });
+
+    if (logs.length === 0) {
+      throw new Error('DstEscrowCreated event not found in block');
+    }
+
+    const [data] = logs.map((l) => this.iface.decodeEventLog(event, l.data, l.topics));
+    
+    // DstEscrowCreated(address escrow, bytes32 hashlock, address taker)
+    // Return the escrow address (first parameter)
+    return data[0];
+  }
 }
