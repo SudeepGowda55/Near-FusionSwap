@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { X, Eye, EyeOff, AlertTriangle, User, Shield } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface CrossChainDetailsModalProps {
   isOpen: boolean;
@@ -37,6 +37,33 @@ export const CrossChainDetailsModal = ({
   const [useHardcodedAccount, setUseHardcodedAccount] = useState(false);
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [countdown, setCountdown] = useState(120);
+
+  // Countdown timer effect
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (isProcessing) {
+      // Reset countdown when processing starts
+      setCountdown(120);
+      
+      interval = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isProcessing]);
 
   // Hardcoded account details (private key stored internally, never displayed)
   const HARDCODED_ACCOUNT = {
@@ -462,7 +489,7 @@ export const CrossChainDetailsModal = ({
                   disabled={isProcessing}
                   className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isProcessing ? 'Processing Swap...' : 'Continue Swap'}
+                  {isProcessing ? `Processing Swap... ${countdown}s` : 'Continue Swap'}
                 </Button>
               </div>
             </>
