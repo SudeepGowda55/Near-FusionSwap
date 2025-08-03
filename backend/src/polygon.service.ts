@@ -28,7 +28,7 @@ export class PolygonService {
   src: Chain;
   resolver: Wallet;
   contractFactory: EscrowFactory;
-  srcResolverContract: Wallet;
+  dstResolverContract: Wallet;
   srcTimestamp: bigint;
 
   public async initialize() {
@@ -39,7 +39,7 @@ export class PolygonService {
       this.src.provider,
       this.src.escrowFactory,
     );
-    this.srcResolverContract = await Wallet.fromAddress(
+    this.dstResolverContract = await Wallet.fromAddress(
       this.src.resolver,
       this.src.provider,
     );
@@ -167,99 +167,72 @@ export class PolygonService {
     return srcEscrowEvent;
   }
 
-  public async deployDestEscrow(orderData: OrderDto): Promise<string> {
-    // Setup destination chain (Polygon acts as destination in this scenario)
-    const dst = await this.initChain(config.chain.polygon);
-
-    const dstChainResolver = new Wallet(polygonResolverPk, dst.provider);
-
-    const dstFactory = new EscrowFactory(dst.provider, dst.escrowFactory);
-
-    // Setup resolver contract with funds and approvals
-    const dstResolverContract = await Wallet.fromAddress(
-      dst.resolver,
-      dst.provider,
-    );
-    await dstResolverContract.topUpFromDonor(
+  public async deployDestEscrow(
+    orderData: OrderDto,
+    hashLock: string,
+  ): Promise<{
+    newDstImmutables: Sdk.Immutables;
+    newDstImmutablesComplement: Sdk.DstImmutablesComplement;
+    dstDeployedAt: bigint;
+  }> {
+    await this.dstResolverContract.topUpFromDonor(
       config.chain.polygon.tokens.WETH.address, // Polygon WETH
       config.chain.polygon.tokens.WETH.donor,
       parseEther('0.00001'), // 0.00001 WETH
     );
-    // Top up contract for approve
-    await dstChainResolver.transfer(dst.resolver, parseEther('1'));
-    await dstResolverContract.unlimitedApprove(
+
+    // Transfer 1 MATIC to resolver contract for gas
+    await this.resolver.transfer(
+      await this.dstResolverContract.getAddress(),
+      parseEther('1'),
+    );
+
+    await this.dstResolverContract.unlimitedApprove(
       config.chain.polygon.tokens.WETH.address,
-      dst.escrowFactory,
+      this.src.escrowFactory,
     );
 
     // Build destination immutables from orderData input
     const newDstImmutables = Sdk.Immutables.new({
       orderHash: orderData.orderHash,
-      hashLock: Sdk.HashLock.fromString(orderData.hashlock),
+      hashLock: Sdk.HashLock.fromString(hashLock),
       maker: new Sdk.Address(orderData.maker),
-      taker: new Sdk.Address(orderData.taker),
+      taker: new Sdk.Address(await this.resolver.getAddress()),
       token: new Sdk.Address(orderData.token),
-      amount: BigInt(orderData.amount),
-      safetyDeposit: BigInt(orderData.safetyDeposit),
-      timeLocks: Sdk.TimeLocks.fromBigInt(BigInt(orderData.timelocks)),
+      amount: parseEther(orderData.amount),
+      safetyDeposit: parseEther('0.00001'),
+      timeLocks: orderData.timelocks,
     });
 
     const newDstImmutablesComplement = Sdk.DstImmutablesComplement.new({
-      maker: new Sdk.Address(orderData.maker),
-      amount: BigInt(orderData.amount),
-      token: new Sdk.Address(orderData.token),
-      safetyDeposit: BigInt(orderData.safetyDeposit),
+      maker: newDstImmutables.maker,
+      amount: newDstImmutables.amount,
+      token: newDstImmutables.token,
+      safetyDeposit: newDstImmutables.safetyDeposit,
     });
 
-    const resolverContract = new Resolver('', dst.resolver);
+    const resolverContractInstance = new Resolver('', this.src.resolver);
 
     console.log(
-      `[${config.chain.polygon.chainId}]`,
+      `[${this.chainId}]`,
       `Depositing ${newDstImmutables.amount} for order ${orderData.orderHash}`,
     );
+
     const { txHash: dstDepositHash, blockTimestamp: dstDeployedAt } =
-      await dstChainResolver.send(resolverContract.deployDst(newDstImmutables));
+      await this.resolver.send(
+        resolverContractInstance.deployDst(newDstImmutables),
+      );
     console.log(
-      `[${config.chain.polygon.chainId}]`,
-      `Created dst deposit for order ${orderData.orderHash} in tx ${dstDepositHash}`,
-    );
-
-    const ESCROW_DST_IMPLEMENTATION = await dstFactory.getDestinationImpl();
-
-    // Note: srcEscrowEvent would come from the source chain deployment data
-    // For now, we'll use the orderData to reconstruct what we need
-    const dstEscrowAddress = new Sdk.EscrowFactory(
-      new Sdk.Address(dst.escrowFactory),
-    ).getDstEscrowAddress(
-      newDstImmutables,
-      newDstImmutablesComplement,
-      dstDeployedAt,
-      new Sdk.Address(resolverContract.dstAddress),
-      ESCROW_DST_IMPLEMENTATION,
+      `[${this.chainId}] Deployed Dst Escrow Contract in polygon with tx ${dstDepositHash}`,
     );
 
     await this.increaseTime(11);
 
-    // User shares key after validation of dst escrow deployment
-    console.log(
-      `[${config.chain.polygon.chainId}]`,
-      `Withdrawing funds for user from ${dstEscrowAddress}`,
-    );
-    // await dstChainResolver.send(
-    //   resolverContract.withdraw(
-    //     'dst',
-    //     dstEscrowAddress,
-    //     orderData.secret, // Secret should be provided in orderData
-    //     newDstImmutables.withDeployedAt(dstDeployedAt),
-    //   ),
-    // );
-
-    // console.log(
-    //   `[${config.chain.polygon.chainId}]`,
-    //   `Withdrew funds from destination escrow ${dstEscrowAddress}`,
-    // );
-
-    return `Destination escrow deployed and withdrawal completed! Escrow: ${dstEscrowAddress}, Deploy Tx: ${dstDepositHash}`;
+    return {
+      newDstImmutables,
+      newDstImmutablesComplement,
+      dstDeployedAt,
+    };
   }
 
   public async srcEscrowWithdraw(
@@ -298,7 +271,8 @@ export class PolygonService {
   }
 
   public async destEscrowWithdraw(
-    srcEscrowEvent: [Sdk.Immutables, Sdk.DstImmutablesComplement],
+    dstImmutables: Sdk.Immutables,
+    dstImmutablesComplement: Sdk.DstImmutablesComplement,
     secret: string,
     dstDeployedAt: bigint,
   ) {
@@ -310,25 +284,19 @@ export class PolygonService {
     const dstEscrowAddress = new Sdk.EscrowFactory(
       new Address(this.src.escrowFactory),
     ).getDstEscrowAddress(
-      srcEscrowEvent[0],
-      srcEscrowEvent[1],
+      dstImmutables,
+      dstImmutablesComplement,
       dstDeployedAt,
       new Address(resolverContract.dstAddress),
       ESCROW_DST_IMPLEMENTATION,
     );
-
-    await this.increaseTime(11);
 
     console.log(
       `[${this.chainId}]`,
       `Withdrawing funds for user from ${dstEscrowAddress}`,
     );
 
-    const dstImmutables = srcEscrowEvent[0]
-      .withComplement(srcEscrowEvent[1])
-      .withTaker(new Address(resolverContract.dstAddress));
-
-    await this.resolver.send(
+    const { txHash: dstWithdrawHash } = await this.resolver.send(
       resolverContract.withdraw(
         'dst',
         dstEscrowAddress,
@@ -339,21 +307,9 @@ export class PolygonService {
 
     console.log(
       `[${this.chainId}]`,
-      `Withdrawing funds for resolver from ${dstEscrowAddress}`,
-    );
-    const { txHash: resolverWithdrawHash } = await this.resolver.send(
-      resolverContract.withdraw(
-        'src',
-        dstEscrowAddress,
-        secret,
-        srcEscrowEvent[0],
-      ),
-    );
-    console.log(
-      `[${this.chainId}]`,
-      `Withdrew funds for resolver from ${dstEscrowAddress} to ${this.src.resolver} in tx ${resolverWithdrawHash}`,
+      `Successfully withdrew funds for resolver from ${dstEscrowAddress} to ${this.src.resolver} in tx ${dstWithdrawHash}`,
     );
 
-    return 'Dest withdraw successful';
+    return;
   }
 }

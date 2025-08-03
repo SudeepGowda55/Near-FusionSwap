@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body } from '@nestjs/common';
 import { PolygonService } from './polygon.service';
 import { NearService } from './near.service';
 import { OrderService } from './order.service';
-import { CreateOrderDto } from './dto/order.dto';
+import { CreateOrderDto, OrderDto } from './dto/order.dto';
 
 @Controller()
 export class AppController {
@@ -70,31 +70,33 @@ export class AppController {
   @Post('near-to-polygon')
   public async swapNearToPolygon(@Body() createOrderDto: CreateOrderDto) {
     try {
-      const { order, orderHash, signature, orderBuild } =
-        await this.orderService.createOrder(createOrderDto, null, null);
-      console.log('Order created:', order);
+      await this.polygonService.initialize();
 
-      const srcEscrowEvent = await this.nearService.deploySrcEscrow();
-      console.log('NEAR src escrow deployed:', srcEscrowEvent);
+      const secret = this.orderService.getOrderSecret();
 
-      // const details = await this.polygonService.deployDestEscrow(
-      //   order,
-      //   orderHash,
-      //   signature,
-      // );
-      // console.log('Polygon dest escrow deployed:', details);
+      const { hash } = await this.nearService.deploySrcEscrow();
+      console.log('NEAR src escrow deployed');
 
-      const secret = await this.orderService.getOrderSecret();
+      // this hash and hashlock should be same
+
+      const hashLock =
+        '0x8b1d2da4868c646e5eaa1ce360da51ddfec51ee2eae96d1bac442f0462979f02';
+
+      const order = OrderDto.fromCreateOrderDto(createOrderDto, hashLock);
+
+      const { newDstImmutables, newDstImmutablesComplement, dstDeployedAt } =
+        await this.polygonService.deployDestEscrow(order, hashLock);
+      console.log('Polygon dest escrow deployed');
 
       const srcWithdraw = await this.nearService.srcEscrowWithdraw();
       console.log('NEAR src withdraw:', srcWithdraw);
 
-      const destWithdraw = await this.polygonService.destEscrowWithdraw(
-        null,
+      await this.polygonService.destEscrowWithdraw(
+        newDstImmutables,
+        newDstImmutablesComplement,
         secret,
-        null,
+        dstDeployedAt,
       );
-      console.log('Polygon dest withdraw:', destWithdraw);
 
       return {
         success: true,
@@ -102,8 +104,6 @@ export class AppController {
         data: {
           order,
           secret,
-          srcWithdraw,
-          destWithdraw,
         },
       };
     } catch (error) {

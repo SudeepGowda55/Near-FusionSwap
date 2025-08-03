@@ -46,7 +46,7 @@ export class OrderService {
       new Address(escrowFactory),
       {
         salt: Sdk.randBigInt(1000n),
-        maker: new Address('flexlock-1inch.testnet'),
+        maker: new Address(await makerWallet.getAddress()),
         makingAmount: parseUnits(
           `${createOrderdto.makingAmount}`,
           createOrderdto.makerAssetDecimals,

@@ -25,7 +25,10 @@ export class NearService {
     // Generate a proper hex secret (32 bytes = 64 hex chars)
     const secret = crypto.randomBytes(32).toString('hex');
     // Hash the BINARY representation of the hex secret
-    const hash = crypto.createHash('sha256').update(Buffer.from(secret, 'hex')).digest('hex');
+    const hash = crypto
+      .createHash('sha256')
+      .update(Buffer.from(secret, 'hex'))
+      .digest('hex');
     return { secret, hash };
   }
 
@@ -54,10 +57,10 @@ export class NearService {
   public async deploySrcEscrow(
     maker: string = this.ALICE,
     resolver: string = this.RESOLVER,
-    amount: string = '1000000000000000000000000'
+    amount: string = '1000000000000000000000000',
   ): Promise<HTLCResponse> {
     console.log('🔹 Creating HTLC on NEAR (source chain)...');
-    
+
     const { secret, hash } = this.generateSecretHash();
     const timelocks = this.calculateTimelocks();
     const htlcId = `source_htlc_${Date.now()}`;
@@ -71,7 +74,7 @@ export class NearService {
       hashlock: hash,
       timelocks: timelocks,
       is_destination: false, // This is source chain
-      partial_secrets_hex: null
+      partial_secrets_hex: null,
     };
 
     console.log('📋 HTLC Parameters:', JSON.stringify(htlcParams, null, 2));
@@ -81,14 +84,15 @@ export class NearService {
 
     // In a real implementation, this would call the NEAR contract
     // near call $CONTRACT new_htlc '...' --accountId $ALICE --deposit 1
-    
+
     return {
       htlc_id: htlcId,
       secret: secret,
       hash: hash,
       contract_address: this.CONTRACT_ID,
-      message: 'HTLC created on NEAR (source chain) - Alice SENDS NEAR → Resolver RECEIVES NEAR',
-      status: 'success'
+      message:
+        'HTLC created on NEAR (source chain) - Alice SENDS NEAR → Resolver RECEIVES NEAR',
+      status: 'success',
     };
   }
 
@@ -96,10 +100,10 @@ export class NearService {
   public async deployDestEscrow(
     resolver: string = this.RESOLVER,
     maker: string = this.ALICE,
-    amount: string = '1000000000000000000000000'
+    amount: string = '1000000000000000000000000',
   ): Promise<HTLCResponse> {
     console.log('🔹 Creating HTLC on NEAR (destination chain)...');
-    
+
     const { secret, hash } = this.generateSecretHash();
     const timelocks = this.calculateTimelocks();
     const htlcId = `dest_htlc_${Date.now()}`;
@@ -113,7 +117,7 @@ export class NearService {
       hashlock: hash,
       timelocks: timelocks,
       is_destination: true, // This is destination chain
-      partial_secrets_hex: null
+      partial_secrets_hex: null,
     };
 
     console.log('📋 HTLC Parameters:', JSON.stringify(htlcParams, null, 2));
@@ -129,15 +133,21 @@ export class NearService {
       secret: secret,
       hash: hash,
       contract_address: this.CONTRACT_ID,
-      message: 'HTLC created on NEAR (destination chain) - Resolver SENDS NEAR → Alice RECEIVES NEAR',
-      status: 'success'
+      message:
+        'HTLC created on NEAR (destination chain) - Resolver SENDS NEAR → Alice RECEIVES NEAR',
+      status: 'success',
     };
   }
 
   // Claim on source escrow (Alice claims NEAR back as confirmation)
-  public async srcEscrowWithdraw(htlcId?: string, secret?: string): Promise<HTLCResponse> {
-    console.log('🔹 Alice (Maker) claiming NEAR tokens (confirmation of completed swap)...');
-    
+  public async srcEscrowWithdraw(
+    htlcId?: string,
+    secret?: string,
+  ): Promise<HTLCResponse> {
+    console.log(
+      '🔹 Alice (Maker) claiming NEAR tokens (confirmation of completed swap)...',
+    );
+
     // In a real implementation, this would call the NEAR contract
     // near call $CONTRACT claim '{"htlc_id": "'$HTLC_ID'", "secret": "'$SECRET'"}' --accountId $ALICE
 
@@ -146,15 +156,19 @@ export class NearService {
       secret: secret || 'claimed_secret',
       hash: 'claimed_hash',
       contract_address: this.CONTRACT_ID,
-      message: 'Alice claimed NEAR tokens using secret - confirms resolver completed destination side',
-      status: 'success'
+      message:
+        'Alice claimed NEAR tokens using secret - confirms resolver completed destination side',
+      status: 'success',
     };
   }
 
   // Claim on destination escrow (Alice claims NEAR tokens)
-  public async destEscrowWithdraw(htlcId?: string, secret?: string): Promise<HTLCResponse> {
+  public async destEscrowWithdraw(
+    htlcId?: string,
+    secret?: string,
+  ): Promise<HTLCResponse> {
     console.log('🔹 Alice (Final Recipient/Maker) claiming NEAR tokens...');
-    
+
     // In a real implementation, this would call the NEAR contract
     // near call $CONTRACT claim '{"htlc_id": "'$HTLC_ID'", "secret": "'$SECRET'"}' --accountId $ALICE
 
@@ -163,15 +177,16 @@ export class NearService {
       secret: secret || 'claimed_secret',
       hash: 'claimed_hash',
       contract_address: this.CONTRACT_ID,
-      message: 'Alice claimed NEAR tokens and revealed secret - Resolver can now claim on source chain',
-      status: 'success'
+      message:
+        'Alice claimed NEAR tokens and revealed secret - Resolver can now claim on source chain',
+      status: 'success',
     };
   }
 
   // Cancel order
   public async cancel(htlcId?: string): Promise<HTLCResponse> {
     console.log('🔹 Cancelling HTLC order...');
-    
+
     // In a real implementation, this would call the NEAR contract
     // near call $CONTRACT refund '{"htlc_id": "'$HTLC_ID'"}' --accountId $RESOLVER
 
@@ -181,14 +196,14 @@ export class NearService {
       hash: 'cancelled',
       contract_address: this.CONTRACT_ID,
       message: 'Order cancelled by maker',
-      status: 'cancelled'
+      status: 'cancelled',
     };
   }
 
   // Get HTLC details
   public async getHTLCDetails(htlcId: string): Promise<any> {
     console.log('🔍 Querying HTLC details...');
-    
+
     // In a real implementation, this would call the NEAR contract
     // near view $CONTRACT get_htlc_details '{"htlc_id": "'$HTLC_ID'"}'
 
@@ -199,7 +214,7 @@ export class NearService {
       receiver: this.ALICE,
       amount: '1000000000000000000000000',
       is_destination: true,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     };
   }
 }
