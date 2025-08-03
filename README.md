@@ -116,6 +116,7 @@ cd Near-FusionSwap
 cd frontend
 npm install
 cp .env.example .env.local
+# Edit .env.local to set NEXT_PUBLIC_BACKEND_URL if different from default
 npm run dev
 ```
 
@@ -129,7 +130,7 @@ npm install
 yarn start:dev
 ```
 
-The backend API will be available at `http://localhost:3001`
+The backend API will be available at `https://37623a0a3f91.ngrok-free.app`
 
 ### 4. Setup Smart Contracts
 
@@ -153,7 +154,7 @@ cargo build --target wasm32-unknown-unknown --release
 
 #### Frontend (`.env.local`)
 ```env
-BACKEND_URL=http://localhost:3001
+NEXT_PUBLIC_BACKEND_URL=https://37623a0a3f91.ngrok-free.app
 NEXT_PUBLIC_CHAIN_ID=137
 ```
 

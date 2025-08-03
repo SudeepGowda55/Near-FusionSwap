@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Forward the request to the backend
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://37623a0a3f91.ngrok-free.app';
     const response = await fetch(`${backendUrl}/polygon-to-near/`, {
       method: 'POST',
       headers: {
