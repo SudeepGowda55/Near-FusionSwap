@@ -13,6 +13,7 @@ interface CrossChainDetailsModalProps {
   onSubmit: (details: CrossChainDetails) => void;
   fromToken: string;
   toToken: string;
+  isProcessing?: boolean;
 }
 
 interface CrossChainDetails {
@@ -26,7 +27,8 @@ export const CrossChainDetailsModal = ({
   onClose, 
   onSubmit, 
   fromToken, 
-  toToken 
+  toToken,
+  isProcessing = false
 }: CrossChainDetailsModalProps) => {
   const [privateKey, setPrivateKey] = useState("");
   const [receiverAddress, setReceiverAddress] = useState("");
@@ -442,15 +444,17 @@ export const CrossChainDetailsModal = ({
                 <Button
                   variant="outline"
                   onClick={handleClose}
-                  className="flex-1 border-border hover:bg-accent"
+                  disabled={isProcessing}
+                  className="flex-1 border-border hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleSubmit}
-                  className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
+                  disabled={isProcessing}
+                  className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Continue Swap
+                  {isProcessing ? 'Processing Swap...' : 'Continue Swap'}
                 </Button>
               </div>
             </>

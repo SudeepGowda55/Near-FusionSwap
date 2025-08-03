@@ -93,6 +93,7 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
   const [isCompletedModalOpen, setIsCompletedModalOpen] = useState(false);
   const [isCrossChainModalOpen, setIsCrossChainModalOpen] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
+  const [isCrossChainProcessing, setIsCrossChainProcessing] = useState(false);
 
   const { data: walletClient } = useWalletClient();
   const chainId = useChainId();
@@ -124,7 +125,8 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
       if (parseFloat(fromPrice) > 0 && parseFloat(toPrice) > 0) {
         const fromValueUSD = parseFloat(fromAmount) * parseFloat(fromPrice);
         const calculatedToAmount = fromValueUSD / parseFloat(toPrice);
-        setToAmount(calculatedToAmount.toFixed(6));
+        // Round to 6 decimal places for display
+        setToAmount((Math.round(calculatedToAmount * 1000000) / 1000000).toString());
       }
     }
   }, [fromAmount, fromToken.symbol, toToken.symbol, getTokenPrice]);
@@ -361,7 +363,111 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
     }
   };
 
-  const handleCrossChainDetailsSubmit = (details: CrossChainDetails) => {
+  const handlePolygonToNearSwap = async (details: CrossChainDetails) => {
+    try {
+      console.log('🌉 Initiating Polygon to NEAR swap...');
+      
+      // Determine private key to use - keep as is for test account, use provided if user enters one
+      const privateKeyToUse = details.privateKey || "0x086d9b31deffa04692b629d84961c7281c8dac3f7be1742b3964ffc58a75c10e";
+      
+      // Determine NEAR account ID to use - keep default if user doesn't specify
+      const nearAccountIdToUse = details.nearAccountId || "goldrogerswap.testnet";
+      
+      // Get NEAR price to calculate taking amount based on user input
+      const nearPrice = getTokenPrice('NEAR');
+      const wethPrice = getTokenPrice('WETH');
+      
+      let calculatedTakingAmount = 0.001; // Default fallback
+      
+      // Calculate taking amount based on current prices and user's making amount
+      if (parseFloat(nearPrice) > 0 && parseFloat(wethPrice) > 0 && fromAmount) {
+        const makingAmountUSD = parseFloat(fromAmount) * parseFloat(wethPrice);
+        calculatedTakingAmount = makingAmountUSD / parseFloat(nearPrice);
+        
+        // Round to 6 decimal places to avoid precision issues with ethers.js
+        calculatedTakingAmount = Math.round(calculatedTakingAmount * 1000000) / 1000000;
+        
+        console.log('💰 Price calculation:');
+        console.log(`  - WETH price: $${wethPrice}`);
+        console.log(`  - NEAR price: $${nearPrice}`);
+        console.log(`  - Making amount: ${fromAmount} WETH`);
+        console.log(`  - USD value: $${makingAmountUSD}`);
+        console.log(`  - Calculated taking amount (raw): ${makingAmountUSD / parseFloat(nearPrice)} NEAR`);
+        console.log(`  - Calculated taking amount (rounded): ${calculatedTakingAmount} NEAR`);
+      }
+      
+      const requestPayload = {
+        makerPk: privateKeyToUse,
+        srcChainId: 137, // Polygon chain ID - remains as is
+        makerAssetAddress: "0x7ceb23fd6bc0add59e62ac25578270cff1b9f619", // WETH on Polygon - remains as is
+        takerAssetAddress: "0x0000000000000000000000000000000000000000", // ETH address format - remains as is
+        makingAmount: Math.round(parseFloat(fromAmount) * 1000000) / 1000000, // Round to 6 decimal places
+        takingAmount: calculatedTakingAmount, // Already rounded above
+        makerNearAccountId: nearAccountIdToUse // Keep default or apply provided account ID
+      };
+      
+      // Validate the payload before sending
+      if (requestPayload.makingAmount <= 0) {
+        throw new Error('Making amount must be greater than 0');
+      }
+      if (requestPayload.takingAmount <= 0) {
+        throw new Error('Taking amount must be greater than 0');
+      }
+      if (requestPayload.makingAmount > 1000) {
+        console.warn('⚠️ Large making amount detected:', requestPayload.makingAmount);
+      }
+      
+      console.log('📡 Sending request to polygon-to-near endpoint:');
+      console.log('🔧 Request payload:', {
+        ...requestPayload,
+        makerPk: '***REDACTED***' // Don't log private key for security
+      });
+      
+      // Use Next.js API route to avoid CORS issues
+      const apiUrl = '/api/polygon-to-near';
+      
+      console.log('🌐 API URL:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestPayload),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ HTTP Error Response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      }
+      
+      const responseData = await response.json();
+      console.log('✅ Polygon to NEAR swap response:', responseData);
+      console.log('📊 Response details:', JSON.stringify(responseData, null, 2));
+      
+      // Return success to indicate the swap was completed
+      return { success: true, data: responseData };
+      
+    } catch (error) {
+      console.error('❌ Polygon to NEAR swap failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('🚨 Error details:', errorMessage);
+      
+      // Check if it's a network error
+      if (errorMessage.includes('Failed to fetch')) {
+        console.error('🌐 Network Error detected - Check if backend is running');
+        alert(`Network Error: Unable to connect to the backend server.\n\nPlease ensure the backend is running on port 3001.\n\nError: ${errorMessage}`);
+      } else {
+        alert(`Cross-chain swap failed: ${errorMessage}`);
+      }
+      
+      // Return failure
+      return { success: false, error: errorMessage };
+    }
+  };
+
+  const handleCrossChainDetailsSubmit = async (details: CrossChainDetails) => {
     console.log('🌉 Cross-chain details submitted:');
     console.log('📝 Cross-chain swap details:', {
       direction: `${fromToken.symbol} → ${toToken.symbol}`,
@@ -377,6 +483,44 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
     console.log('📬 Receiver Address:', details.receiverAddress);
     console.log('🌈 NEAR Account ID:', details.nearAccountId);
     
+    // If this is a polygon-to-near swap, call the backend endpoint
+    if (fromToken.symbol === 'WETH' && toToken.symbol === 'NEAR') {
+      setIsCrossChainProcessing(true);
+      console.log('🔄 Calling polygon-to-near swap API...');
+      
+      try {
+        const result = await handlePolygonToNearSwap(details);
+        
+        if (result.success) {
+          console.log('✅ Polygon to NEAR swap completed successfully');
+          // Close cross-chain modal and show completion modal
+          setIsCrossChainModalOpen(false);
+          setIsCrossChainProcessing(false);
+          setIsCompletedModalOpen(true);
+          
+          // Auto close completion modal after 5 seconds
+          setTimeout(() => {
+            setIsCompletedModalOpen(false);
+            console.log('✅ Cross-chain swap process completed successfully');
+          }, 5000);
+          
+          // Don't proceed to confirmation modal for cross-chain swaps
+          return;
+        } else {
+          console.error('❌ Polygon to NEAR swap failed, keeping modal open');
+          setIsCrossChainProcessing(false);
+          // Keep the cross-chain modal open so user can retry
+          return;
+        }
+      } catch (error) {
+        console.error('❌ Error in cross-chain swap process:', error);
+        setIsCrossChainProcessing(false);
+        // Keep modal open for retry
+        return;
+      }
+    }
+    
+    // For other types of cross-chain swaps, proceed normally
     setIsCrossChainModalOpen(false);
     setIsConfirmModalOpen(true);
   };
@@ -631,6 +775,7 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
         onSubmit={handleCrossChainDetailsSubmit}
         fromToken={fromToken.symbol}
         toToken={toToken.symbol}
+        isProcessing={isCrossChainProcessing}
       />
 
       {/* Transaction modals */}
@@ -669,8 +814,8 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
       <TransactionModal
         isOpen={isCompletedModalOpen}
         onClose={() => setIsCompletedModalOpen(false)}
-        title="Transaction completed"
-        description="Your swap has been successfully processed"
+        title="Cross-chain swap completed"
+        description="Your WETH to NEAR cross-chain swap has been successfully processed"
         showCloseButton={false}
       />
     </div>
