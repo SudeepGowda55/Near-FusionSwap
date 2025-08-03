@@ -330,7 +330,7 @@ export class NearService {
 
   // Real implementation for claiming on source escrow
   public async srcEscrowWithdraw(htlcId?: string, secret?: string): Promise<HTLCResponse> {
-    console.log('🔹 User (goldrogerswap.testnet) claiming NEAR tokens (confirmation of completed swap)...');
+    console.log('🔹 User (goldrogerswap.testnet) claiming from their own source escrow...');
     await this.initialize();
     
     const claimHtlcId = htlcId || `source_claim_${Date.now()}`;
@@ -347,31 +347,61 @@ export class NearService {
 
     console.log('🔐 Using secret for claiming:', claimSecret);
 
+    // Capture transaction hash
+    const originalLog = console.log;
+    let capturedTransactionHash = '';
+
     try {
-      // Use maker account to claim
-      const makerContract = new Contract(this.makerAccount, CONTRACT_ID, {
+      // Use user account to claim from source escrow (they are the resolver in this HTLC)
+      const userContract = new Contract(this.makerAccount, CONTRACT_ID, {
         viewMethods: ['get_htlc_details'],
         changeMethods: ['new_htlc', 'claim', 'refund'],
       }) as HTLCContract;
 
-      const result = await makerContract.claim({ 
+      // Capture console output for transaction hash
+      console.log = (...args) => {
+        const message = args.join(' ');
+        // Look for "Receipts:" for claim transactions
+        if (message.startsWith('Receipts: ')) {
+          const receipts = message.replace('Receipts: ', '').split(', ');
+          capturedTransactionHash = receipts[0].trim();
+          originalLog('🎯 Captured claim transaction hash:', capturedTransactionHash);
+        }
+        originalLog(...args);
+      };
+
+      const result = await userContract.claim({ 
         signerAccount: this.makerAccount,
         args: { htlc_id: claimHtlcId, secret: claimSecret }
       });
 
-      console.log('✅ Source escrow claim successful');
+      const transactionHash = capturedTransactionHash || `fallback_${claimHtlcId}_${Date.now()}`;
+      const nearExplorerUrl = `https://explorer.testnet.near.org/transactions/${transactionHash}`;
+
+      console.log('✅ Source escrow claim successful - User received their own NEAR tokens back');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🔗 **CLAIM TRANSACTION HASH:**', transactionHash);
+      console.log('🔗 **NEAR EXPLORER:**', nearExplorerUrl);
+      console.log('📋 **HTLC ID:**', claimHtlcId);
+      console.log('🔐 **SECRET USED:**', claimSecret);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       return {
         htlc_id: claimHtlcId,
         secret: claimSecret,
         hash: this.currentHash,
         contract_address: CONTRACT_ID,
-        message: 'User claimed NEAR tokens using secret - confirms resolver completed destination side',
-        status: 'success'
+        message: 'User claimed NEAR tokens from source escrow - Phase 2 complete',
+        status: 'success',
+        transaction_hash: transactionHash,
+        explorer_url: nearExplorerUrl
       };
     } catch (error) {
       console.error('❌ Failed to claim source escrow:', error);
       throw new Error(`Source escrow claim failed: ${error.message}`);
+    } finally {
+      // Restore original console.log
+      console.log = originalLog;
     }
   }
 

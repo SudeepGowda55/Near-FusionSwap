@@ -115,4 +115,6 @@ export class OrderService {
   public getOrderSecret(): string {
     return uint8ArrayToHex(createHash('sha256').update('hackathon').digest());
   }
+
+  
 }
