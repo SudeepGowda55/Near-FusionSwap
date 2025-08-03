@@ -37,7 +37,7 @@ export const CrossChainDetailsModal = ({
   const [useHardcodedAccount, setUseHardcodedAccount] = useState(false);
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [countdown, setCountdown] = useState(120);
+  const [countdown, setCountdown] = useState(100);
 
   // Countdown timer effect
   useEffect(() => {
@@ -45,7 +45,7 @@ export const CrossChainDetailsModal = ({
     
     if (isProcessing) {
       // Reset countdown when processing starts
-      setCountdown(120);
+      setCountdown(100);
       
       interval = setInterval(() => {
         setCountdown((prev) => {

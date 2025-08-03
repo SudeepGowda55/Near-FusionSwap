@@ -7,15 +7,11 @@ import { X, Clock, Zap } from "lucide-react";
 interface ComingSoonModalProps {
   isOpen: boolean;
   onClose: () => void;
-  fromToken: string;
-  toToken: string;
 }
 
 export const ComingSoonModal = ({ 
   isOpen, 
-  onClose, 
-  fromToken,
-  toToken
+  onClose
 }: ComingSoonModalProps) => {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -51,10 +47,10 @@ export const ComingSoonModal = ({
           {/* Message */}
           <div className="text-center space-y-3">
             <h3 className="text-lg font-semibold text-foreground">
-              {fromToken} → {toToken} Support Coming Soon
+              WETH ↔ NEAR Currently Supported
             </h3>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              We&apos;re working hard to bring you more cross-chain swap options. Currently, we support WETH to NEAR swaps on our platform.
+              We&apos;re working hard to bring you more cross-chain swap options. Currently, we support bidirectional swaps between WETH and NEAR.
             </p>
           </div>
 
@@ -67,7 +63,7 @@ export const ComingSoonModal = ({
               <div>
                 <h4 className="text-green-500 font-medium text-sm">Currently Supported</h4>
                 <p className="text-green-600 text-xs mt-1">
-                  <strong>WETH → NEAR</strong> - Full cross-chain swap functionality with HTLC security
+                  <strong>WETH ↔ NEAR</strong> - Full cross-chain swap functionality with HTLC security and MEV protection
                 </p>
               </div>
             </div>
@@ -80,7 +76,6 @@ export const ComingSoonModal = ({
               <div>
                 <h4 className="text-blue-500 font-medium text-sm">Coming Soon</h4>
                 <ul className="text-blue-600 text-xs mt-1 space-y-1">
-                  <li>• NEAR → WETH (Reverse swaps)</li>
                   <li>• USDC, USDT, DAI cross-chain support</li>
                   <li>• Additional EVM networks</li>
                   <li>• Enhanced liquidity options</li>

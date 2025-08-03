@@ -892,8 +892,6 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
       <ComingSoonModal
         isOpen={isComingSoonModalOpen}
         onClose={() => setIsComingSoonModalOpen(false)}
-        fromToken={fromToken.symbol}
-        toToken={toToken.symbol}
       />
     </div>
   );
