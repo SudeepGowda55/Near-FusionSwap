@@ -341,12 +341,6 @@ We welcome contributions! Please follow these steps:
 - Verify contract addresses are correct
 - Check network connectivity
 
-### Getting Help
-
-- **GitHub Issues**: Report bugs and request features
-- **Discord**: Join our community for real-time help
-- **Documentation**: Check our comprehensive docs
-
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
