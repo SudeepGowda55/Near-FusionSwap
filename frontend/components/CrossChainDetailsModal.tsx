@@ -121,6 +121,20 @@ export const CrossChainDetailsModal = ({
 
   const handleSubmit = () => {
     if (validateForm()) {
+      // Create comprehensive payload object
+      const payload = {
+        swapDirection: isNearToEvm ? 'NEAR_TO_EVM' : 'EVM_TO_NEAR',
+        fromToken,
+        toToken,
+        networkFee: '0.0',
+        estimatedTime: '<30 seconds',
+        accountType: useHardcodedAccount ? 'Test Account' : 'Manual Entry',
+        receiverAddress: receiverAddress.trim(),
+        nearAccountId: nearAccountId.trim(),
+        timestamp: new Date().toISOString(),
+        ...(useHardcodedAccount && { address: HARDCODED_ACCOUNT.address })
+      };
+
       // Log details but hide private key for test account
       if (useHardcodedAccount) {
         console.log('✅ Form submitted with test account:', {
@@ -130,6 +144,7 @@ export const CrossChainDetailsModal = ({
           receiverAddress,
           nearAccountId
         });
+        console.log('📦 Payload:', payload);
       } else {
         console.log('✅ Form submitted with manual details:', {
           accountType: 'Manual Entry',
@@ -137,6 +152,7 @@ export const CrossChainDetailsModal = ({
           receiverAddress,
           nearAccountId
         });
+        console.log('📦 Payload:', payload);
       }
       
       onSubmit({

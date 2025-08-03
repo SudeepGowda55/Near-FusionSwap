@@ -571,7 +571,7 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
                   <span className="text-muted-foreground">Network Fee</span>
                   <div className="flex items-center space-x-1">
                     <span className="text-primary text-xs">🔥 Free</span>
-                    <span className="text-muted-foreground">~$0.10</span>
+                    <span className="text-muted-foreground">~$0.0</span>
                   </div>
                 </div>
               </div>

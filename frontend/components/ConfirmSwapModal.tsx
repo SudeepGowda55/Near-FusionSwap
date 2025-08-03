@@ -151,7 +151,7 @@ export const ConfirmSwapModal = ({
                 {isCrossChain ? 'Bridge Fee' : 'Slippage tolerance'}
               </span>
               <span className="text-foreground">
-                {isCrossChain ? '~$2.50' : 'Auto 0.5%'}
+                {isCrossChain ? '$0.0' : 'Auto 0.5%'}
               </span>
             </div>
             <div className="flex justify-between">
@@ -163,13 +163,13 @@ export const ConfirmSwapModal = ({
             <div className="flex justify-between">
               <span className="text-muted-foreground">Network Fee</span>
               <span className="text-foreground">
-                {isCrossChain ? '~$0.50' : '~$0.10'}
+                {isCrossChain ? '$0.0' : '~$0.10'}
               </span>
             </div>
             {isCrossChain && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Estimated Time</span>
-                <span className="text-foreground">5-10 minutes</span>
+                <span className="text-foreground">&lt;30 seconds</span>
               </div>
             )}
           </div>
@@ -208,8 +208,8 @@ export const ConfirmSwapModal = ({
           {/* Cross-chain disclaimer */}
           {isCrossChain && (
             <p className="text-xs text-muted-foreground text-center mt-3">
-              Cross-chain swaps use Hash Time Locked Contracts (HTLC) for secure bridging. 
-              The process may take several minutes to complete.
+             Cross-chain swaps between NEAR and Polygon utilize 1inch Fusion+ protocol 
+             with Hash Time-Locked Contracts (HTLCs) for secure atomic transactions.
             </p>
           )}
         </div>
