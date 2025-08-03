@@ -49,9 +49,12 @@ The cross-chain swap process operates in two distinct phases using Hash Time Loc
 #### Phase 1: NEAR as Destination (Polygon → NEAR Swap)
 When users want to swap tokens **FROM Polygon TO NEAR**:
 
-- **User Account**: `goldrogerswap.testnet` (wants NEAR tokens)
-- **Resolver Account**: `htlc.testnet` (facilitates the swap)
+- [NEAR] **User Account**: `goldrogerswap.testnet` (wants WETH tokens)
+- [NEAR] **Resolver Account**: `htlc.testnet` (facilitates the swap on NEAR)
+- [POLYGON] **User Account**: `0xC15e658AC13a89E8D2E5adBBcf29D5d168554553` (wants NEAR tokens)
+- [NEAR] **Resolver Account**: `0x77ed0fef5e9DFB34e776adb11c29dd19d382745C` (facilitates the swap on POLYGON)
 
+https://polygonscan.com/address/0x77ed0fef5e9dfb34e776adb11c29dd19d382745c
 
 <img width="1300" height="822" alt="Screenshot 2025-08-03 at 9 56 20 PM" src="https://github.com/user-attachments/assets/41ac914a-a3b1-421a-a51d-ff711763107a" />
 
