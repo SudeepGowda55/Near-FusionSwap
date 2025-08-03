@@ -4,13 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronDown, ArrowUpDown, RefreshCw, Shuffle } from "lucide-react";
+import { ChevronDown, RefreshCw, Shuffle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { TokenSelectModal } from "./TokenSelectModal";
 import { TransactionModal } from "./TransactionModal";
 import { TransactionSuccessModal } from "./TransactionSuccessModal";
 import { ConfirmSwapModal } from "./ConfirmSwapModal";
 import { CrossChainDetailsModal } from "./CrossChainDetailsModal";
+import { ComingSoonModal } from "./ComingSoonModal";
 import { useWalletClient, useChainId, useSwitchChain } from "wagmi";
 import { polygon } from "wagmi/chains";
 import { ethers } from "ethers";
@@ -108,6 +109,7 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
   const [isCrossChainModalOpen, setIsCrossChainModalOpen] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [isCrossChainProcessing, setIsCrossChainProcessing] = useState(false);
+  const [isComingSoonModalOpen, setIsComingSoonModalOpen] = useState(false);
 
   const { data: walletClient } = useWalletClient();
   const chainId = useChainId();
@@ -145,67 +147,59 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
     }
   }, [fromAmount, fromToken.symbol, toToken.symbol, getTokenPrice]);
 
-  // Enhanced swap tokens function that properly handles bidirectional swaps
-  const handleSwapTokens = () => {
-    console.log('🔄 Swapping tokens...');
-    console.log('📊 Before swap:');
-    console.log(`  From: ${fromAmount} ${fromToken.symbol}`);
-    console.log(`  To: ${toAmount} ${toToken.symbol}`);
-    
-    const tempToken = fromToken;
-    const tempAmount = fromAmount;
-    
-    setFromToken(toToken);
-    setToToken(tempToken);
-    setFromAmount(toAmount);
-    setToAmount(tempAmount);
-    
-    console.log('📊 After swap:');
-    console.log(`  From: ${toAmount} ${toToken.symbol}`);
-    console.log(`  To: ${tempAmount} ${tempToken.symbol}`);
-  };
-
   // Enhanced token selection that ensures both WETH and NEAR are available
   const handleFromTokenSelect = (token: Token) => {
     console.log('🎯 Selected from token:', token.symbol);
-    setFromToken(token);
     
-    // If the same token is selected for both, swap the "to" token
-    if (token.symbol === toToken.symbol) {
-      const availableTokens = [
-        { symbol: "WETH", name: "Wrapped Ether", icon: "🔵", balance: "$0", networks: 11 },
-        { symbol: "NEAR", name: "NEAR Protocol", icon: "🌈", balance: "$0", networks: 1 },
-        { symbol: "USDC", name: "USD Coin", icon: "🔵", balance: "$0", networks: 13 },
-        { symbol: "USDT", name: "Tether USD", icon: "🟢", balance: "$0", networks: 13 }
-      ];
-      
-      const otherToken = availableTokens.find(t => t.symbol !== token.symbol);
-      if (otherToken) {
-        setToToken(otherToken);
-        console.log('🔄 Auto-swapped to token to:', otherToken.symbol);
-      }
+    // Special handling for NEAR token - if NEAR is selected as "from", 
+    // automatically set the correct WETH → NEAR combination
+    if (token.symbol === 'NEAR') {
+      console.log('🌈 NEAR selected as "from" token, setting up WETH → NEAR combination');
+      setFromToken({ symbol: "WETH", name: "Wrapped Ether", icon: "🔵", balance: "$0", networks: 11 });
+      setToToken({ symbol: "NEAR", name: "NEAR Protocol", icon: "🌈", balance: "$0", networks: 1 });
+      return;
     }
+    
+    // Special handling for WETH token - if WETH is selected as "from",
+    // automatically set NEAR as "to" token
+    if (token.symbol === 'WETH') {
+      console.log('🔵 WETH selected as "from" token, setting NEAR as "to" token');
+      setFromToken(token);
+      setToToken({ symbol: "NEAR", name: "NEAR Protocol", icon: "🌈", balance: "$0", networks: 1 });
+      return;
+    }
+    
+    // For any other token selection, show coming soon modal
+    console.log('⚠️ Unsupported token selected as "from":', token.symbol);
+    setIsComingSoonModalOpen(true);
+    // Don't change the current selection
   };
 
   const handleToTokenSelect = (token: Token) => {
     console.log('🎯 Selected to token:', token.symbol);
-    setToToken(token);
     
-    // If the same token is selected for both, swap the "from" token
-    if (token.symbol === fromToken.symbol) {
-      const availableTokens = [
-        { symbol: "WETH", name: "Wrapped Ether", icon: "🔵", balance: "$0", networks: 11 },
-        { symbol: "NEAR", name: "NEAR Protocol", icon: "🌈", balance: "$0", networks: 1 },
-        { symbol: "USDC", name: "USD Coin", icon: "🔵", balance: "$0", networks: 13 },
-        { symbol: "USDT", name: "Tether USD", icon: "🟢", balance: "$0", networks: 13 }
-      ];
-      
-      const otherToken = availableTokens.find(t => t.symbol !== token.symbol);
-      if (otherToken) {
-        setFromToken(otherToken);
-        console.log('🔄 Auto-swapped from token to:', otherToken.symbol);
-      }
+    // Special handling for WETH token - if WETH is selected as "to", 
+    // automatically set the correct WETH → NEAR combination
+    if (token.symbol === 'WETH') {
+      console.log('🔵 WETH selected as "to" token, setting up WETH → NEAR combination');
+      setFromToken({ symbol: "WETH", name: "Wrapped Ether", icon: "🔵", balance: "$0", networks: 11 });
+      setToToken({ symbol: "NEAR", name: "NEAR Protocol", icon: "🌈", balance: "$0", networks: 1 });
+      return;
     }
+    
+    // Special handling for NEAR token - if NEAR is selected as "to",
+    // automatically set WETH as "from" token
+    if (token.symbol === 'NEAR') {
+      console.log('🌈 NEAR selected as "to" token, setting WETH as "from" token');
+      setFromToken({ symbol: "WETH", name: "Wrapped Ether", icon: "🔵", balance: "$0", networks: 11 });
+      setToToken(token);
+      return;
+    }
+    
+    // For any other token selection, show coming soon modal
+    console.log('⚠️ Unsupported token selected as "to":', token.symbol);
+    setIsComingSoonModalOpen(true);
+    // Don't change the current selection
   };
 
   // Check if this is a cross-chain swap
@@ -214,9 +208,22 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
            (fromToken.symbol === 'WETH' && toToken.symbol === 'NEAR');
   };
 
+  // Check if the current token combination is supported
+  const isSupportedSwap = () => {
+    // Only WETH to NEAR is currently supported
+    return fromToken.symbol === 'WETH' && toToken.symbol === 'NEAR';
+  };
+
   const handlePermitAndSwap = async () => {
     if (!walletClient) {
       console.error('❌ Wallet not connected');
+      return;
+    }
+
+    // Check if the current swap combination is supported
+    if (!isSupportedSwap()) {
+      console.log('⚠️ Unsupported swap combination:', `${fromToken.symbol} → ${toToken.symbol}`);
+      setIsComingSoonModalOpen(true);
       return;
     }
 
@@ -617,6 +624,16 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
             </div>
           )}
 
+          {/* Unsupported combination indicator */}
+          {!isSupportedSwap() && fromToken.symbol !== toToken.symbol && (
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 mb-4">
+              <p className="text-yellow-500 text-sm flex items-center">
+                <span className="mr-2">🚧</span>
+                {fromToken.symbol} → {toToken.symbol} support coming soon. Currently only WETH → NEAR is available.
+              </p>
+            </div>
+          )}
+
           {/* You pay */}
           <div className="space-y-4">
             <div className="text-sm text-muted-foreground">You pay</div>
@@ -666,7 +683,8 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
               </div>
             </div>
 
-            {/* Swap button */}
+            {/* Swap button - Commented out until NEAR to Polygon implementation is ready */}
+            {/*
             <div className="flex justify-center">
               <Button
                 variant="ghost"
@@ -678,6 +696,7 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
                 <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
               </Button>
             </div>
+            */}
 
             {/* You receive */}
             <div>
@@ -771,14 +790,16 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
             {isWalletConnected ? (
               <Button 
                 onClick={handlePermitAndSwap}
-                disabled={isApproving || pricesLoading}
+                disabled={isApproving || pricesLoading || !isSupportedSwap()}
                 className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isApproving 
                   ? 'Approving Token...'
-                  : isCrossChainSwap() 
-                    ? `Cross-chain Swap ${fromToken.symbol} → ${toToken.symbol}`
-                    : 'Permit and swap'
+                  : !isSupportedSwap()
+                    ? `${fromToken.symbol} → ${toToken.symbol} Coming Soon`
+                    : isCrossChainSwap() 
+                      ? `Cross-chain Swap ${fromToken.symbol} → ${toToken.symbol}`
+                      : 'Permit and swap'
                 }
               </Button>
             ) : (
@@ -865,6 +886,14 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
         }}
         polygonTxHash={transactionDetails.polygonTxHash}
         nearTxHash={transactionDetails.nearTxHash}
+      />
+
+      {/* Coming Soon Modal */}
+      <ComingSoonModal
+        isOpen={isComingSoonModalOpen}
+        onClose={() => setIsComingSoonModalOpen(false)}
+        fromToken={fromToken.symbol}
+        toToken={toToken.symbol}
       />
     </div>
   );
