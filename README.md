@@ -1,6 +1,6 @@
 # Near-FusionSwap
 
-A cross-chain decentralized exchange (DEX) enabling seamless token swaps between Polygon and NEAR Protocol using Hash Time Locked Contracts (HTLCs) and the 1inch cross-chain infrastructure.
+A cross-chain decentralized exchange (DEX) enabling seamless token swaps between Polygon and NEAR Protocol using Hash Time Locked Contracts (HTLCs) and the 1inch Fusion+ cross-chain infrastructure.
 
 ## Video Demonstration
 
@@ -53,15 +53,17 @@ When users want to swap tokens **FROM Polygon TO NEAR**:
 
 <br/>
 
-<img width="1115" height="858" alt="Screenshot 2025-08-03 at 9 57 28 PM" src="https://github.com/user-attachments/assets/fddcb8ae-fead-4030-9988-9d44282155d3" />
-
-
 **Detailed Process Flow:**
 1. **HTLC Creation**: Resolver (`htlc.testnet`) creates a new HTLC contract on NEAR Protocol
 2. **Funding**: Resolver deposits NEAR tokens into the HTLC and sets `is_destination = true`
 3. **Secret Reveal**: User reveals the secret hash to claim NEAR tokens from the HTLC
 4. **Cross-Chain Claim**: Using the revealed secret, Resolver claims USDC/WETH from the Polygon HTLC
 5. **Completion**: Atomic swap completed - User receives NEAR, Resolver receives Polygon tokens
+
+
+<img width="1115" height="858" alt="Screenshot 2025-08-03 at 9 57 28 PM" src="https://github.com/user-attachments/assets/fddcb8ae-fead-4030-9988-9d44282155d3" />
+
+
 
 #### Phase 2: NEAR as Source (NEAR → Polygon Swap)
 When users want to swap tokens **FROM NEAR TO Polygon**:
