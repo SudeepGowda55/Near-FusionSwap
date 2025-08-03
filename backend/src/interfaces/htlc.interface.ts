@@ -5,4 +5,7 @@ export interface HTLCResponse {
   contract_address: string;
   message: string;
   status: string;
+  transaction_hash?: string;
+  explorer_url?: string;
+  receipts?: string[];
 } 

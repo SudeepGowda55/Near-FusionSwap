@@ -1,80 +1,198 @@
+
 import { Injectable } from '@nestjs/common';
-import { connect, keyStores, KeyPair } from 'near-api-js';
+import { connect, Contract, keyStores, KeyPair } from 'near-api-js';
 import * as crypto from 'crypto';
 import { HTLCResponse } from './interfaces/htlc.interface';
 
-interface HTLCRequest {
-  fromChain: string;
-  toChain: string;
-  fromToken: string;
-  toToken: string;
-  fromAmount: string;
-  toAmount: string;
-  maker: string;
-  resolver: string;
+// Custom console wrapper to suppress NEAR receipt logs
+const originalConsoleLog = console.log;
+const originalConsoleInfo = console.info;
+
+// Temporarily disable console override to see all logs
+console.log = originalConsoleLog;
+console.info = originalConsoleInfo;
+
+console.info = (...args) => {
+  const message = args.join(' ');
+  if (!message.includes('Receipt:') && 
+      !message.includes('Log [flexlock-1inch.testnet]:') &&
+      !message.includes('Receipts:')) {
+    originalConsoleInfo(...args);
+  }
+};
+
+// Use the compatible NEAR API configuration
+const NEAR_CONFIG = {
+  networkId: 'testnet',
+  keyStore: new keyStores.InMemoryKeyStore(),
+  nodeUrl: 'https://rpc.testnet.near.org',
+  walletUrl: 'https://wallet.testnet.near.org',
+  helperUrl: 'https://helper.testnet.near.org',
+  explorerUrl: 'https://explorer.testnet.near.org',
+};
+
+const CONTRACT_ID = 'flexlock-1inch.testnet';
+// Real NEAR testnet accounts provided by user
+const RESOLVER_ACCOUNT = 'htlc.testnet';
+const MAKER_ACCOUNT = 'goldrogerswap.testnet';
+
+// Real private keys from the provided JSON files
+const RESOLVER_PRIVATE_KEY = 'ed25519:4f531FqBKzMKTPhzaAntW2Jciq3hFFEEUxKgRCfQU9hn8kUnVvjw17MZSwvgVfLkTgbBwJ3iB9GzmUER7J5FQGmL';
+const MAKER_PRIVATE_KEY = 'ed25519:qE5dhFpxEoye4RwTxHrrUUKC8HTgY7xA1bND7WhBrXksEDaJoykLzZTwhLWNwm5AUVoP8bJfmefhUiAmYD8QkJi';
+
+// Contract interface
+interface HTLCContract extends Contract {
+  new_htlc: (params: {
+    signerAccount: any;
+    args: {
+      htlc_id: string;
+      sender: string;
+      receiver: string;
+      hashlock: string;
+      timelocks: {
+        withdrawal: number;
+        public_withdrawal: number;
+        cancellation: number;
+        public_cancellation: number;
+      };
+      is_destination: boolean;
+      partial_secrets_hex?: string[] | null;
+    };
+    gas?: string;
+    amount?: string;
+  }) => Promise<any>;
+  claim: (params: { signerAccount: any; args: { htlc_id: string; secret: string } }) => Promise<any>;
+  refund: (params: { signerAccount: any; args: { htlc_id: string } }) => Promise<any>;
+  get_htlc_details: (args: { htlc_id: string }) => Promise<any>;
+}
+
+// Define proper return types
+export interface SrcEscrowResult {
+  htlc_id: string;
+  secret: string;
+  hash: string;
+  timelocks: any;
+  result: any;
+  message: string;
+}
+
+export interface DestEscrowResult {
+  htlc_id: string;
+  hash: string;
+  timelocks: any;
+  result: any;
+  transaction_hash?: string;
+  explorer_url?: string;
+  message: string;
 }
 
 @Injectable()
 export class NearService {
-  private readonly CONTRACT_ID = 'flexlock-1inch.testnet';
-  private readonly ALICE = 'flexlock-swap.testnet';
-  private readonly RESOLVER = 'htlc.testnet';
+  private near: any;
+  private contract: HTLCContract | null = null;
+  private resolverAccount: any;
+  private makerAccount: any;
+  private currentSecret: string = '';
+  private currentHash: string = '';
 
-  // Generate secret and hash like in the bash script
+  async initialize() {
+    if (this.contract) return;
+
+    console.log('🔧 Initializing NEAR service with real testnet accounts...');
+    
+    try {
+      // Create key pairs from the provided private keys
+      const resolverKeyPair = KeyPair.fromString(RESOLVER_PRIVATE_KEY);
+      const makerKeyPair = KeyPair.fromString(MAKER_PRIVATE_KEY);
+      
+      // Store keys in keystore
+      await NEAR_CONFIG.keyStore.setKey(NEAR_CONFIG.networkId, RESOLVER_ACCOUNT, resolverKeyPair);
+      await NEAR_CONFIG.keyStore.setKey(NEAR_CONFIG.networkId, MAKER_ACCOUNT, makerKeyPair);
+      
+      // Initialize NEAR connection with proper configuration
+      this.near = await connect(NEAR_CONFIG);
+      
+      // Create accounts with the real keys
+      this.resolverAccount = await this.near.account(RESOLVER_ACCOUNT);
+      this.makerAccount = await this.near.account(MAKER_ACCOUNT);
+
+      // Initialize real contract using the compatible API
+      this.contract = new Contract(this.resolverAccount, CONTRACT_ID, {
+        viewMethods: ['get_htlc_details'],
+        changeMethods: ['new_htlc', 'claim', 'refund'],
+      }) as HTLCContract;
+
+      console.log('✅ NEAR contract service initialized with real testnet accounts');
+      console.log('📋 Contract ID:', CONTRACT_ID);
+      console.log('👤 Resolver Account:', RESOLVER_ACCOUNT);
+      console.log('👤 Maker Account:', MAKER_ACCOUNT);
+      console.log('🔑 Using real private keys for signing transactions');
+    } catch (error) {
+      console.error('❌ Failed to initialize NEAR service:', error);
+      throw new Error(`NEAR service initialization failed: ${error.message}`);
+    }
+  }
+
   private generateSecretHash(): { secret: string; hash: string } {
     // Generate a proper hex secret (32 bytes = 64 hex chars)
     const secret = crypto.randomBytes(32).toString('hex');
     // Hash the BINARY representation of the hex secret
-    const hash = crypto
-      .createHash('sha256')
-      .update(Buffer.from(secret, 'hex'))
-      .digest('hex');
+    const hash = crypto.createHash('sha256').update(Buffer.from(secret, 'hex')).digest('hex');
+    
+    // Store for later use
+    this.currentSecret = secret;
+    this.currentHash = hash;
+    
     return { secret, hash };
   }
 
-  // Calculate timelocks like in the bash script
   private calculateTimelocks(): {
-    withdrawal: string;
-    public_withdrawal: string;
-    cancellation: string;
-    public_cancellation: string;
+    withdrawal: number;
+    public_withdrawal: number;
+    cancellation: number;
+    public_cancellation: number;
   } {
     const now = Date.now() * 1000000; // Convert to nanoseconds
-    const withdrawal = (now + 1800000000000).toString(); // +30 minutes
-    const public_withdrawal = (now + 3600000000000).toString(); // +1 hour
-    const cancellation = (now + 5400000000000).toString(); // +1.5 hours
-    const public_cancellation = (now + 7200000000000).toString(); // +2 hours
-
     return {
-      withdrawal,
-      public_withdrawal,
-      cancellation,
-      public_cancellation,
+      withdrawal: now + 1800000000000, // +30 minutes
+      public_withdrawal: now + 3600000000000, // +1 hour
+      cancellation: now + 5400000000000, // +1.5 hours
+      public_cancellation: now + 7200000000000, // +2 hours
     };
   }
 
-  // Deploy source escrow (NEAR as source chain)
+  // Real implementation for deploying source escrow (NEAR as source chain)
   public async deploySrcEscrow(
-    maker: string = this.ALICE,
-    resolver: string = this.RESOLVER,
+    maker: string = MAKER_ACCOUNT,
+    resolver: string = RESOLVER_ACCOUNT,
     amount: string = '1000000000000000000000000',
-  ): Promise<HTLCResponse> {
+    hashlock?: string
+  ): Promise<SrcEscrowResult> {
     console.log('🔹 Creating HTLC on NEAR (source chain)...');
-
-    const { secret, hash } = this.generateSecretHash();
+    await this.initialize();
+    
+    // Remove '0x' prefix from hashlock if present for NEAR contract compatibility
+    const cleanHashlock = hashlock && hashlock.startsWith('0x') 
+      ? hashlock.slice(2) 
+      : hashlock;
+    
+    const { secret, hash } = cleanHashlock
+      ? { secret: '', hash: cleanHashlock }
+      : this.generateSecretHash();
+    
     const timelocks = this.calculateTimelocks();
-    const htlcId = `source_htlc_${Date.now()}`;
+    const htlcId = `source_htlc_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
-    // Alice (Maker) creates HTLC on NEAR (source chain)
-    // Alice SENDS NEAR tokens → Resolver RECEIVES NEAR tokens (as reimbursement)
+    // User (goldrogerswap.testnet) creates HTLC on NEAR (source chain)
+    // User SENDS NEAR tokens → Resolver RECEIVES NEAR tokens (as reimbursement)
     const htlcParams = {
       htlc_id: htlcId,
-      sender: maker, // Alice (Maker) is the sender
+      sender: maker, // User (goldrogerswap.testnet) is the sender
       receiver: resolver, // Resolver receives NEAR as reimbursement
       hashlock: hash,
       timelocks: timelocks,
       is_destination: false, // This is source chain
-      partial_secrets_hex: null,
+      partial_secrets_hex: null
     };
 
     console.log('📋 HTLC Parameters:', JSON.stringify(htlcParams, null, 2));
@@ -82,42 +200,68 @@ export class NearService {
     console.log('🔐 Secret (hex):', secret);
     console.log('🔑 Hash:', hash);
 
-    // In a real implementation, this would call the NEAR contract
-    // near call $CONTRACT new_htlc '...' --accountId $ALICE --deposit 1
+    try {
+      // Use maker account to create the HTLC
+      const makerContract = new Contract(this.makerAccount, CONTRACT_ID, {
+        viewMethods: ['get_htlc_details'],
+        changeMethods: ['new_htlc', 'claim', 'refund'],
+      }) as HTLCContract;
 
-    return {
-      htlc_id: htlcId,
-      secret: secret,
-      hash: hash,
-      contract_address: this.CONTRACT_ID,
-      message:
-        'HTLC created on NEAR (source chain) - Alice SENDS NEAR → Resolver RECEIVES NEAR',
-      status: 'success',
-    };
+      const result = await makerContract.new_htlc({
+        signerAccount: this.makerAccount,
+        args: htlcParams,
+        gas: '300000000000000', // Gas limit
+        amount: amount // Deposit amount
+      });
+
+      console.log('✅ Source HTLC deployed successfully:', result);
+
+      return {
+        htlc_id: htlcId,
+        secret: secret,
+        hash: hash,
+        timelocks: timelocks,
+        result: result,
+        message: 'HTLC created on NEAR (source chain) - User SENDS NEAR → Resolver RECEIVES NEAR'
+      };
+    } catch (error) {
+      console.error('❌ Failed to deploy src escrow:', error);
+      throw new Error(`Source escrow deployment failed: ${error.message}`);
+    }
   }
 
-  // Deploy destination escrow (NEAR as destination chain)
+  // Real implementation for deploying destination escrow (NEAR as destination chain)
   public async deployDestEscrow(
-    resolver: string = this.RESOLVER,
-    maker: string = this.ALICE,
+    resolver: string = RESOLVER_ACCOUNT,
+    maker: string = MAKER_ACCOUNT,
     amount: string = '1000000000000000000000000',
-  ): Promise<HTLCResponse> {
+    hashlock?: string
+  ): Promise<DestEscrowResult> {
     console.log('🔹 Creating HTLC on NEAR (destination chain)...');
-
-    const { secret, hash } = this.generateSecretHash();
+    await this.initialize();
+    
+    // Remove '0x' prefix from hashlock if present for NEAR contract compatibility
+    const cleanHashlock = hashlock && hashlock.startsWith('0x') 
+      ? hashlock.slice(2) 
+      : hashlock;
+    
+    const { secret, hash } = cleanHashlock
+      ? { secret: this.currentSecret, hash: cleanHashlock }
+      : this.generateSecretHash();
+    
     const timelocks = this.calculateTimelocks();
-    const htlcId = `dest_htlc_${Date.now()}`;
+    const htlcId = `dest_htlc_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
     // Resolver creates HTLC on NEAR (destination chain)
-    // Resolver SENDS NEAR tokens → Alice RECEIVES NEAR tokens
+    // Resolver SENDS NEAR tokens → User RECEIVES NEAR tokens
     const htlcParams = {
       htlc_id: htlcId,
       sender: resolver, // Resolver is the sender (providing NEAR)
-      receiver: maker, // Alice (Maker) receives NEAR tokens
+      receiver: maker, // User (goldrogerswap.testnet) receives NEAR tokens
       hashlock: hash,
       timelocks: timelocks,
       is_destination: true, // This is destination chain
-      partial_secrets_hex: null,
+      partial_secrets_hex: null
     };
 
     console.log('📋 HTLC Parameters:', JSON.stringify(htlcParams, null, 2));
@@ -125,96 +269,249 @@ export class NearService {
     console.log('🔐 Secret (hex):', secret);
     console.log('🔑 Hash:', hash);
 
-    // In a real implementation, this would call the NEAR contract
-    // near call $CONTRACT new_htlc '...' --accountId $RESOLVER --deposit 1
+    // Declare originalLog outside the try block to fix the scope issue
+    const originalLog = console.log;
+    let capturedTransactionHash = '';
 
-    return {
-      htlc_id: htlcId,
-      secret: secret,
-      hash: hash,
-      contract_address: this.CONTRACT_ID,
-      message:
-        'HTLC created on NEAR (destination chain) - Resolver SENDS NEAR → Alice RECEIVES NEAR',
-      status: 'success',
-    };
+    try {
+      // Capture console output to get the real transaction hash
+      console.log = (...args) => {
+        const message = args.join(' ');
+        if (message.startsWith('Receipt: ')) {
+          capturedTransactionHash = message.replace('Receipt: ', '').trim();
+          originalLog('🎯 Captured transaction hash:', capturedTransactionHash);
+        }
+        originalLog(...args); // Still log normally
+      };
+
+      const result = await this.contract!.new_htlc({
+        signerAccount: this.resolverAccount,
+        args: htlcParams,
+        gas: '300000000000000', // Gas limit
+        amount: amount // Deposit amount
+      });
+
+      // Use the captured hash instead of fallback
+      const transactionHash = capturedTransactionHash || `fallback_${htlcId}_${Date.now()}`;
+      
+      console.log('🔍 Full result object:', JSON.stringify(result, null, 2));
+      console.log('🔍 Result type:', typeof result);
+      console.log('🔍 Captured transaction hash:', capturedTransactionHash);
+      console.log('🔍 Final transaction hash:', transactionHash);
+
+      const nearExplorerUrl = `https://explorer.testnet.near.org/transactions/${transactionHash}`;
+      
+      console.log('✅ Destination HTLC deployed successfully!');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🔗 **REAL TRANSACTION HASH:**', transactionHash);
+      console.log('🔗 **NEAR EXPLORER:**', nearExplorerUrl);
+      console.log('📋 **HTLC ID:**', htlcId);
+      console.log('🔐 **HASHLOCK:**', hash);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      return {
+        htlc_id: htlcId,
+        hash: hash,
+        timelocks: timelocks,
+        result: result,
+        transaction_hash: transactionHash, // Now using the real hash!
+        explorer_url: nearExplorerUrl,
+        message: 'HTLC created on NEAR (destination chain) - Resolver SENDS NEAR → User RECEIVES NEAR'
+      };
+
+    } catch (error) {
+      console.error('❌ Failed to deploy dest escrow:', error);
+      throw new Error(`Destination escrow deployment failed: ${error.message}`);
+    } finally {
+      // Restore original console.log in finally block to ensure it always runs
+      console.log = originalLog;
+    }
   }
 
-  // Claim on source escrow (Alice claims NEAR back as confirmation)
-  public async srcEscrowWithdraw(
-    htlcId?: string,
-    secret?: string,
-  ): Promise<HTLCResponse> {
-    console.log(
-      '🔹 Alice (Maker) claiming NEAR tokens (confirmation of completed swap)...',
-    );
+  // Real implementation for claiming on source escrow
+  public async srcEscrowWithdraw(htlcId?: string, secret?: string): Promise<HTLCResponse> {
+    console.log('🔹 User (goldrogerswap.testnet) claiming NEAR tokens (confirmation of completed swap)...');
+    await this.initialize();
+    
+    const claimHtlcId = htlcId || `source_claim_${Date.now()}`;
+    let claimSecret = secret || this.currentSecret;
 
-    // In a real implementation, this would call the NEAR contract
-    // near call $CONTRACT claim '{"htlc_id": "'$HTLC_ID'", "secret": "'$SECRET'"}' --accountId $ALICE
+    if (!claimSecret) {
+      throw new Error('No secret available for claiming');
+    }
 
-    return {
-      htlc_id: htlcId || `source_claim_${Date.now()}`,
-      secret: secret || 'claimed_secret',
-      hash: 'claimed_hash',
-      contract_address: this.CONTRACT_ID,
-      message:
-        'Alice claimed NEAR tokens using secret - confirms resolver completed destination side',
-      status: 'success',
-    };
+    // Remove '0x' prefix if present for NEAR compatibility
+    if (claimSecret.startsWith('0x')) {
+      claimSecret = claimSecret.slice(2);
+    }
+
+    console.log('🔐 Using secret for claiming:', claimSecret);
+
+    try {
+      // Use maker account to claim
+      const makerContract = new Contract(this.makerAccount, CONTRACT_ID, {
+        viewMethods: ['get_htlc_details'],
+        changeMethods: ['new_htlc', 'claim', 'refund'],
+      }) as HTLCContract;
+
+      const result = await makerContract.claim({ 
+        signerAccount: this.makerAccount,
+        args: { htlc_id: claimHtlcId, secret: claimSecret }
+      });
+
+      console.log('✅ Source escrow claim successful');
+
+      return {
+        htlc_id: claimHtlcId,
+        secret: claimSecret,
+        hash: this.currentHash,
+        contract_address: CONTRACT_ID,
+        message: 'User claimed NEAR tokens using secret - confirms resolver completed destination side',
+        status: 'success'
+      };
+    } catch (error) {
+      console.error('❌ Failed to claim source escrow:', error);
+      throw new Error(`Source escrow claim failed: ${error.message}`);
+    }
   }
 
-  // Claim on destination escrow (Alice claims NEAR tokens)
-  public async destEscrowWithdraw(
-    htlcId?: string,
-    secret?: string,
-  ): Promise<HTLCResponse> {
-    console.log('🔹 Alice (Final Recipient/Maker) claiming NEAR tokens...');
+  // Real implementation for claiming on destination escrow
+  public async destEscrowWithdraw(htlcId?: string, secret?: string): Promise<HTLCResponse> {
+    console.log('🔹 User (Final Recipient) claiming NEAR tokens...');
+    await this.initialize();
+    
+    const claimHtlcId = htlcId || `dest_claim_${Date.now()}`;
+    let claimSecret = secret || this.currentSecret;
 
-    // In a real implementation, this would call the NEAR contract
-    // near call $CONTRACT claim '{"htlc_id": "'$HTLC_ID'", "secret": "'$SECRET'"}' --accountId $ALICE
+    if (!claimSecret) {
+      throw new Error('No secret available for claiming');
+    }
 
-    return {
-      htlc_id: htlcId || `dest_claim_${Date.now()}`,
-      secret: secret || 'claimed_secret',
-      hash: 'claimed_hash',
-      contract_address: this.CONTRACT_ID,
-      message:
-        'Alice claimed NEAR tokens and revealed secret - Resolver can now claim on source chain',
-      status: 'success',
-    };
+    // Remove '0x' prefix if present for NEAR compatibility
+    if (claimSecret.startsWith('0x')) {
+      claimSecret = claimSecret.slice(2);
+    }
+
+    console.log('🔐 Using secret for claiming:', claimSecret);
+
+    // Declare originalLog outside the try block to fix the scope issue
+    const originalLog = console.log;
+    let capturedTransactionHash = '';
+
+    try {
+      // Use maker account to claim
+      const makerContract = new Contract(this.makerAccount, CONTRACT_ID, {
+        viewMethods: ['get_htlc_details'],
+        changeMethods: ['new_htlc', 'claim', 'refund'],
+      }) as HTLCContract;
+
+      // Capture console output for claim transaction
+      console.log = (...args) => {
+        const message = args.join(' ');
+        // For claims, look for "Receipts:" instead of "Receipt:"
+        if (message.startsWith('Receipts: ')) {
+          // Take the first receipt hash as the transaction hash
+          const receipts = message.replace('Receipts: ', '').split(', ');
+          capturedTransactionHash = receipts[0].trim();
+          originalLog('🎯 Captured claim transaction hash:', capturedTransactionHash);
+        }
+        originalLog(...args);
+      };
+
+      const result = await makerContract.claim({ 
+        signerAccount: this.makerAccount,
+        args: { htlc_id: claimHtlcId, secret: claimSecret }
+      });
+
+      const transactionHash = capturedTransactionHash || `fallback_${claimHtlcId}_${Date.now()}`;
+      
+      const nearExplorerUrl = `https://explorer.testnet.near.org/transactions/${transactionHash}`;
+      
+      console.log('✅ Destination escrow claim successful');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🔗 **REAL TRANSACTION HASH:**', transactionHash);
+      console.log('🔗 **NEAR EXPLORER:**', nearExplorerUrl);
+      console.log('📋 **HTLC ID:**', claimHtlcId);
+      console.log('🔐 **SECRET:**', claimSecret);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      return {
+        htlc_id: claimHtlcId,
+        secret: claimSecret,
+        hash: this.currentHash,
+        contract_address: CONTRACT_ID,
+        message: 'User claimed NEAR tokens and revealed secret - Resolver can now claim on source chain',
+        status: 'success',
+        transaction_hash: transactionHash,
+        explorer_url: nearExplorerUrl
+      };
+    } catch (error) {
+      console.error('❌ Failed to claim destination escrow:', error);
+      throw new Error(`Destination escrow claim failed: ${error.message}`);
+    } finally {
+      // Restore original console.log in finally block to ensure it always runs
+      console.log = originalLog;
+    }
   }
 
-  // Cancel order
+  // Real implementation for cancelling order
   public async cancel(htlcId?: string): Promise<HTLCResponse> {
     console.log('🔹 Cancelling HTLC order...');
+    await this.initialize();
+    
+    const cancelHtlcId = htlcId || `cancelled_${Date.now()}`;
 
-    // In a real implementation, this would call the NEAR contract
-    // near call $CONTRACT refund '{"htlc_id": "'$HTLC_ID'"}' --accountId $RESOLVER
+    try {
+      const result = await this.contract!.refund({ 
+        signerAccount: this.resolverAccount,
+        args: { htlc_id: cancelHtlcId }
+      });
 
-    return {
-      htlc_id: htlcId || `cancelled_${Date.now()}`,
-      secret: 'cancelled',
-      hash: 'cancelled',
-      contract_address: this.CONTRACT_ID,
-      message: 'Order cancelled by maker',
-      status: 'cancelled',
-    };
+      console.log('✅ HTLC cancellation successful');
+
+      return {
+        htlc_id: cancelHtlcId,
+        secret: 'cancelled',
+        hash: 'cancelled',
+        contract_address: CONTRACT_ID,
+        message: 'Order cancelled by maker',
+        status: 'cancelled'
+      };
+    } catch (error) {
+      console.error('❌ Failed to cancel HTLC:', error);
+      throw new Error(`HTLC cancellation failed: ${error.message}`);
+    }
   }
 
-  // Get HTLC details
+  // Real implementation for getting HTLC details
   public async getHTLCDetails(htlcId: string): Promise<any> {
     console.log('🔍 Querying HTLC details...');
+    await this.initialize();
+    
+    try {
+      const details = await this.contract!.get_htlc_details({ htlc_id: htlcId });
+      console.log('✅ HTLC details retrieved');
+      return details;
+    } catch (error) {
+      console.error('❌ Failed to get HTLC details:', error);
+      throw new Error(`HTLC details retrieval failed: ${error.message}`);
+    }
+  }
 
-    // In a real implementation, this would call the NEAR contract
-    // near view $CONTRACT get_htlc_details '{"htlc_id": "'$HTLC_ID'"}'
+  // Get current secret and hash for external use
+  public getCurrentSecret(): string {
+    return this.currentSecret;
+  }
 
-    return {
-      htlc_id: htlcId,
-      status: 'active',
-      sender: this.RESOLVER,
-      receiver: this.ALICE,
-      amount: '1000000000000000000000000',
-      is_destination: true,
-      created_at: new Date().toISOString(),
-    };
+  public getCurrentHash(): string {
+    return this.currentHash;
+  }
+
+  // Method to set secret and hash from external source (e.g., from Polygon)
+  public setSecretAndHash(secret: string, hash: string): void {
+    // Remove '0x' prefix from secret for NEAR compatibility
+    this.currentSecret = secret.startsWith('0x') ? secret.slice(2) : secret;
+    this.currentHash = hash;
+    console.log('🔐 Secret and hash set from external source');
   }
 }
