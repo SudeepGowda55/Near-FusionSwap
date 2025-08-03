@@ -5,6 +5,7 @@ use near_sdk::{
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::json_types::U128;
 use near_sdk::serde_json;
+use tiny_keccak::{Hasher, Keccak};
 use hex;
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone)]
@@ -140,7 +141,11 @@ impl EscrowDestination {
 
         // Validate secret
         let secret_bytes = hex::decode(&secret).expect("Invalid secret hex");
-        let computed_hash = env::sha256(&secret_bytes);
+        let mut hasher = Keccak::v256();
+        let mut output = [0u8; 32];
+        hasher.update(&secret_bytes);
+        hasher.finalize(&mut output);
+        let computed_hash: CryptoHash = output;
         let computed_hashlock: CryptoHash = computed_hash.as_slice().try_into().unwrap();
 
         let is_main_secret = self.hashlock == computed_hashlock;
