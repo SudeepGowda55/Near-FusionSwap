@@ -48,6 +48,14 @@ When users want to swap tokens **FROM Polygon TO NEAR**:
 - **User Account**: `goldrogerswap.testnet` (wants NEAR tokens)
 - **Resolver Account**: `htlc.testnet` (facilitates the swap)
 
+
+<img width="1300" height="822" alt="Screenshot 2025-08-03 at 9 56 20 PM" src="https://github.com/user-attachments/assets/41ac914a-a3b1-421a-a51d-ff711763107a" />
+
+<br/>
+
+<img width="1115" height="858" alt="Screenshot 2025-08-03 at 9 57 28 PM" src="https://github.com/user-attachments/assets/fddcb8ae-fead-4030-9988-9d44282155d3" />
+
+
 **Detailed Process Flow:**
 1. **HTLC Creation**: Resolver (`htlc.testnet`) creates a new HTLC contract on NEAR Protocol
 2. **Funding**: Resolver deposits NEAR tokens into the HTLC and sets `is_destination = true`
@@ -60,6 +68,9 @@ When users want to swap tokens **FROM NEAR TO Polygon**:
 
 - **User Account**: `goldrogerswap.testnet` (wants Polygon tokens)
 - **Resolver Account**: `htlc.testnet` (facilitates the swap)
+
+<img width="1398" height="865" alt="Screenshot 2025-08-03 at 9 56 59 PM" src="https://github.com/user-attachments/assets/a4fa4472-7efb-447a-a05a-d575af7fe4cb" />
+
 
 **Detailed Process Flow:**
 1. **HTLC Creation**: User (`goldrogerswap.testnet`) creates a new HTLC contract on NEAR Protocol
@@ -290,13 +301,6 @@ We welcome contributions! Please follow these steps:
 - Write comprehensive tests for new features
 - Update documentation for API changes
 - Use conventional commit messages
-
-## Documentation
-
-- [Smart Contract Architecture](./docs/smart-contracts.md)
-- [API Reference](./docs/api-reference.md)
-- [Deployment Guide](./docs/deployment.md)
-- [Troubleshooting](./docs/troubleshooting.md)
 
 ## Troubleshooting
 
