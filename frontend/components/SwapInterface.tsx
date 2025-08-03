@@ -89,6 +89,7 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isCompletedModalOpen, setIsCompletedModalOpen] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
+  const [approvalTxHash, setApprovalTxHash] = useState<string | null>(null);
 
   const { data: walletClient } = useWalletClient();
   const chainId = useChainId();
@@ -188,6 +189,70 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
     }
   };
 
+  // ✅ NEW: Function to wait for transaction confirmation
+  const waitForTransactionConfirmation = async (
+    txHash: string, 
+    provider: ethers.BrowserProvider,
+    maxWaitTime: number = 300000 // 5 minutes
+  ): Promise<ethers.TransactionReceipt | null> => {
+    console.log('⏳ Waiting for transaction confirmation:', txHash);
+    
+    const startTime = Date.now();
+    let receipt = null;
+    
+    while (Date.now() - startTime < maxWaitTime) {
+      try {
+        receipt = await provider.getTransactionReceipt(txHash);
+        if (receipt) {
+          if (receipt.status === 1) {
+            console.log('✅ Transaction confirmed successfully:', txHash);
+            return receipt;
+          } else {
+            console.error('❌ Transaction failed:', txHash);
+            throw new Error('Transaction failed on blockchain');
+          }
+        }
+        
+        // Wait 2 seconds before next check
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        console.log('⏳ Still waiting for confirmation...');
+        
+      } catch (error) {
+        console.error('⚠️ Error checking transaction status:', error);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+    
+    throw new Error('Transaction confirmation timeout');
+  };
+
+  // ✅ NEW: Function to validate current allowance after approval
+  const validateApprovalSuccess = async (
+    tokenAddress: string,
+    spenderAddress: string,
+    requiredAmount: bigint,
+    approvalService: TokenApprovalService
+  ): Promise<boolean> => {
+    try {
+      console.log('🔍 Validating approval success...');
+      
+      // Wait a bit for blockchain state to update
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      const currentAllowance = await approvalService.getCurrentAllowance(tokenAddress, spenderAddress);
+      console.log('📊 Current allowance after approval:', ethers.formatEther(currentAllowance));
+      console.log('💰 Required amount:', ethers.formatEther(requiredAmount));
+      
+      const isApproved = currentAllowance >= requiredAmount;
+      console.log('✅ Approval validation result:', isApproved);
+      
+      return isApproved;
+    } catch (error) {
+      console.error('❌ Failed to validate approval:', error);
+      return false;
+    }
+  };
+
   const handlePermitAndSwap = async () => {
     if (!walletClient) {
       console.error('❌ Wallet not connected');
@@ -230,16 +295,47 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
 
       // Handle NEAR tokens differently - they don't need ERC-20 approval
       if (fromToken.symbol === 'NEAR') {
-        console.log('🌈 NEAR token detected - skipping ERC-20 approval process');
-        console.log('📝 NEAR tokens are handled differently in cross-chain swaps');
+        console.log('🌈 NEAR token detected - processing cross-chain swap...');
+        console.log('📝 NEAR tokens require cross-chain bridge interaction');
         
-        // Add a small delay to show the modal briefly
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        setIsSigningModalOpen(false);
-        setIsConfirmModalOpen(true);
-        setIsApproving(false);
-        return;
+        // ✅ Call your backend API for NEAR cross-chain swap
+        try {
+          const swapResponse = await fetch('http://localhost:3001/near-to-polygon', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              fromChain: 'near',
+              toChain: 'polygon',
+              fromToken: 'NEAR',
+              toToken: toToken.symbol,
+              fromAmount: ethers.parseUnits(fromAmount, 24).toString(), // NEAR uses 24 decimals
+              toAmount: ethers.parseUnits(toAmount, TOKEN_CONFIG[toToken.symbol as keyof typeof TOKEN_CONFIG].decimals).toString(),
+              maker: 'flexlock-swap.testnet',
+              resolver: 'htlc.testnet'
+            })
+          });
+
+          if (!swapResponse.ok) {
+            throw new Error('Cross-chain swap initiation failed');
+          }
+
+          const swapResult = await swapResponse.json();
+          console.log('✅ Cross-chain swap initiated:', swapResult);
+          
+          // Add a delay to show the modal
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          setIsSigningModalOpen(false);
+          setIsConfirmModalOpen(true);
+          setIsApproving(false);
+          return;
+          
+        } catch (error) {
+          console.error('❌ Cross-chain swap failed:', error);
+          throw new Error('Failed to initiate cross-chain swap');
+        }
       }
       
       // Initialize token approval service for ERC-20 tokens
@@ -273,12 +369,11 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
       // Check current allowance with error handling
       let currentAllowance: bigint;
       let approvalNeeded = true;
+      const requiredAmount = ethers.parseUnits(fromAmount, TOKEN_CONFIG[fromToken.symbol as keyof typeof TOKEN_CONFIG].decimals);
       
       try {
         currentAllowance = await approvalService.getCurrentAllowance(tokenAddress, ONEINCH_ROUTER);
         console.log('📊 Current allowance:', ethers.formatEther(currentAllowance));
-        
-        const requiredAmount = ethers.parseUnits(fromAmount, TOKEN_CONFIG[fromToken.symbol as keyof typeof TOKEN_CONFIG].decimals);
         console.log('💰 Required amount:', ethers.formatEther(requiredAmount));
         
         approvalNeeded = currentAllowance < requiredAmount;
@@ -303,9 +398,54 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
           throw new Error(approvalResult.error || 'Token approval failed');
         }
 
-        console.log('✅ Token approval completed successfully!');
+        console.log('✅ Approval transaction submitted!');
         console.log('📜 Transaction hash:', approvalResult.transactionHash);
-        console.log('🎯 Token approved for unlimited spending by 1inch Router');
+        
+        // ✅ Store the transaction hash for validation
+        setApprovalTxHash(approvalResult.transactionHash!);
+
+        // ✅ Wait for transaction confirmation  
+        console.log('⏳ Waiting for approval transaction to be confirmed...');
+        
+        try {
+          const receipt = await waitForTransactionConfirmation(
+            approvalResult.transactionHash!,
+            provider,
+            300000 // 5 minutes timeout
+          );
+
+          if (!receipt) {
+            throw new Error('Transaction confirmation timeout');
+          }
+
+          console.log('✅ Approval transaction confirmed on blockchain!');
+          console.log('📊 Gas used:', receipt.gasUsed.toString());
+          console.log('📦 Block number:', receipt.blockNumber);
+
+          // ✅ Validate that the approval actually worked
+          console.log('🔍 Validating approval success...');
+          
+          const isApprovalValid = await validateApprovalSuccess(
+            tokenAddress,
+            ONEINCH_ROUTER,
+            requiredAmount,
+            approvalService
+          );
+
+          if (!isApprovalValid) {
+            throw new Error('Approval validation failed - insufficient allowance after approval');
+          }
+
+          console.log('✅ Approval validation successful!');
+          console.log('🎯 Token approved and validated successfully');
+
+        } catch (confirmationError) {
+  console.error('❌ Transaction confirmation failed:', confirmationError);
+  const errorMessage = confirmationError instanceof Error 
+    ? confirmationError.message 
+    : 'Unknown confirmation error';
+  throw new Error(`Approval confirmation failed: ${errorMessage}`);
+}
       } else {
         console.log('✅ Sufficient allowance already exists, skipping approval');
         
@@ -333,21 +473,89 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
       alert(`Approval failed: ${errorMessage}. Please try again.`);
     } finally {
       setIsApproving(false);
+      setApprovalTxHash(null);
       console.log('🏁 Permit and swap process completed');
     }
   };
 
-  const handleConfirmSwap = () => {
+  const handleConfirmSwap = async () => {
     console.log('🔄 Confirming swap...');
     console.log(`📊 Final swap: ${fromAmount} ${fromToken.symbol} → ${toAmount} ${toToken.symbol}`);
-    setIsConfirmModalOpen(false);
-    setIsCompletedModalOpen(true);
     
-    // Auto close completion modal after 3 seconds
-    setTimeout(() => {
-      setIsCompletedModalOpen(false);
-      console.log('✅ Swap process completed successfully');
-    }, 3000);
+    try {
+      setIsConfirmModalOpen(false);
+      setIsSigningModalOpen(true);
+      
+      // ✅ Call appropriate backend endpoint based on swap direction
+      let apiEndpoint = '';
+      let swapData = {};
+      
+      if (fromToken.symbol === 'NEAR' || toToken.symbol === 'NEAR') {
+        // Cross-chain swap involving NEAR
+        if (fromToken.symbol === 'NEAR') {
+          apiEndpoint = 'http://localhost:3001/near-to-polygon';
+          swapData = {
+            fromChain: 'near',
+            toChain: 'polygon',
+            fromToken: 'NEAR',
+            toToken: toToken.symbol,
+            fromAmount: ethers.parseUnits(fromAmount, 24).toString(), // NEAR uses 24 decimals
+            toAmount: ethers.parseUnits(toAmount, TOKEN_CONFIG[toToken.symbol as keyof typeof TOKEN_CONFIG].decimals).toString(),
+            maker: 'flexlock-swap.testnet',
+            resolver: 'htlc.testnet'
+          };
+        } else {
+          apiEndpoint = 'http://localhost:3001/polygon-to-near';
+          swapData = {
+            fromChain: 'polygon',
+            toChain: 'near',
+            fromToken: fromToken.symbol,
+            toToken: 'NEAR',
+            fromAmount: ethers.parseUnits(fromAmount, TOKEN_CONFIG[fromToken.symbol as keyof typeof TOKEN_CONFIG].decimals).toString(),
+            toAmount: ethers.parseUnits(toAmount, 24).toString(), // NEAR uses 24 decimals
+            maker: 'flexlock-swap.testnet',
+            resolver: 'htlc.testnet'
+          };
+        }
+        
+        console.log('🌉 Executing cross-chain swap:', swapData);
+        
+        const swapResponse = await fetch(apiEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(swapData)
+        });
+
+        if (!swapResponse.ok) {
+          throw new Error('Cross-chain swap execution failed');
+        }
+
+        const swapResult = await swapResponse.json();
+        console.log('✅ Cross-chain swap completed:', swapResult);
+        
+      } else {
+        // Regular ERC-20 to ERC-20 swap on Polygon
+        console.log('🔄 Executing regular token swap on Polygon...');
+        // Add your 1inch swap logic here
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Simulate swap
+      }
+      
+      setIsSigningModalOpen(false);
+      setIsCompletedModalOpen(true);
+      
+      // Auto close completion modal after 5 seconds
+      setTimeout(() => {
+        setIsCompletedModalOpen(false);
+        console.log('✅ Swap process completed successfully');
+      }, 5000);
+      
+    } catch (error) {
+      console.error('❌ Swap execution failed:', error);
+      setIsSigningModalOpen(false);
+      alert(`Swap failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   // Calculate USD values using real prices
@@ -540,8 +748,8 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
                 className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isApproving 
-                  ? (fromToken.symbol === 'NEAR' ? 'Processing NEAR Swap...' : 'Approving Token...')
-                  : (fromToken.symbol === 'NEAR' ? 'Swap NEAR' : 'Permit and swap')
+                  ? (fromToken.symbol === 'NEAR' ? 'Processing NEAR Swap...' : 'Confirming Approval...')
+                  : (fromToken.symbol === 'NEAR' || toToken.symbol === 'NEAR' ? 'Cross-Chain Swap' : 'Permit and swap')
                 }
               </Button>
             ) : (
@@ -572,15 +780,19 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
       <TransactionModal
         isOpen={isSigningModalOpen}
         onClose={() => setIsSigningModalOpen(false)}
-        title={isApproving ? "Approving Token Access..." : "Please sign the transaction in your wallet"}
+        title={
+          isApproving 
+            ? "Confirming Transaction..." 
+            : "Processing Swap..."
+        }
         description={
           isApproving 
             ? fromToken.symbol === 'NEAR' 
-              ? `Please confirm the NEAR cross-chain swap transaction in your wallet. NEAR tokens are handled differently in cross-chain swaps.`
-              : `Please confirm the ${fromToken.symbol} approval transaction in your wallet to allow 1inch Router to spend your tokens.`
-            : ""
+              ? `Initiating cross-chain swap from NEAR to ${toToken.symbol}. Please confirm the transaction in your wallet.`
+              : `Waiting for approval transaction to be confirmed on blockchain. Transaction: ${approvalTxHash ? `${approvalTxHash.slice(0, 10)}...` : 'Pending'}`
+            : `Executing swap from ${fromToken.symbol} to ${toToken.symbol}...`
         }
-        showCloseButton={true}
+        showCloseButton={false}
       />
 
       <ConfirmSwapModal
@@ -606,9 +818,9 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
       <TransactionModal
         isOpen={isCompletedModalOpen}
         onClose={() => setIsCompletedModalOpen(false)}
-        title="Transaction completed"
-        description="Your swap has been successfully processed"
-        showCloseButton={false}
+        title="Swap Completed! 🎉"
+        description={`Successfully swapped ${fromAmount} ${fromToken.symbol} for ${toAmount} ${toToken.symbol}`}
+        showCloseButton={true}
       />
     </div>
   );
