@@ -3,10 +3,12 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChevronDown, ArrowUpDown, RefreshCw, Shuffle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { TokenSelectModal } from "./TokenSelectModal";
 import { TransactionModal } from "./TransactionModal";
+import { TransactionSuccessModal } from "./TransactionSuccessModal";
 import { ConfirmSwapModal } from "./ConfirmSwapModal";
 import { CrossChainDetailsModal } from "./CrossChainDetailsModal";
 import { useWalletClient, useChainId, useSwitchChain } from "wagmi";
@@ -46,6 +48,12 @@ const TOKEN_CONFIG = {
 
 // 1inch Router V5 contract address on Polygon
 const ONEINCH_ROUTER = "0x111111125421ca6dc452d289314280a0f8842a65";
+
+// Predefined WETH amounts for dropdown
+const WETH_AMOUNTS = [
+  { value: "0.000001", label: "0.000001 WETH" },
+  { value: "0.000002", label: "0.000002 WETH" }
+];
 
 interface Token {
   symbol: string;
@@ -91,6 +99,12 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
   const [isSigningModalOpen, setIsSigningModalOpen] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isCompletedModalOpen, setIsCompletedModalOpen] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [transactionDetails, setTransactionDetails] = useState<{
+    txHash?: string;
+    polygonTxHash?: string;
+    nearTxHash?: string;
+  }>({});
   const [isCrossChainModalOpen, setIsCrossChainModalOpen] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [isCrossChainProcessing, setIsCrossChainProcessing] = useState(false);
@@ -493,16 +507,23 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
         
         if (result.success) {
           console.log('✅ Polygon to NEAR swap completed successfully');
-          // Close cross-chain modal and show completion modal
+          console.log('📊 Transaction result:', result);
+          
+          // Store transaction details
+          setTransactionDetails({
+            polygonTxHash: result.data?.txHash,
+            nearTxHash: result.data?.blockHash // or another hash if available
+          });
+          
+          // Close cross-chain modal and show success modal
           setIsCrossChainModalOpen(false);
           setIsCrossChainProcessing(false);
-          setIsCompletedModalOpen(true);
+          setIsSuccessModalOpen(true);
           
-          // Auto close completion modal after 5 seconds
+          // Reset form state since transaction completed
           setTimeout(() => {
-            setIsCompletedModalOpen(false);
-            console.log('✅ Cross-chain swap process completed successfully');
-          }, 5000);
+            // Small delay to ensure modal state is properly updated
+          }, 100);
           
           // Don't proceed to confirmation modal for cross-chain swaps
           return;
@@ -612,12 +633,28 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
                     <ChevronDown className="h-4 w-4" />
                   </div>
                 </Button>
-                <Input
-                  value={fromAmount}
-                  onChange={(e) => setFromAmount(e.target.value)}
-                  className="text-right text-2xl font-semibold bg-transparent border-none p-0 h-auto text-foreground"
-                  placeholder="0"
-                />
+                {/* Conditional input based on token type */}
+                {fromToken.symbol === 'WETH' && toToken.symbol === 'NEAR' ? (
+                  <Select value={fromAmount} onValueChange={setFromAmount}>
+                    <SelectTrigger className="text-right text-2xl font-semibold bg-transparent border-none p-0 h-auto text-foreground w-auto">
+                      <SelectValue placeholder="Select amount" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {WETH_AMOUNTS.map((amount) => (
+                        <SelectItem key={amount.value} value={amount.value}>
+                          {amount.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    value={fromAmount}
+                    onChange={(e) => setFromAmount(e.target.value)}
+                    className="text-right text-2xl font-semibold bg-transparent border-none p-0 h-auto text-foreground"
+                    placeholder="0"
+                  />
+                )}
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">
@@ -817,6 +854,17 @@ export const SwapInterface = ({ isWalletConnected = false, onConnectWallet }: Sw
         title="Cross-chain swap completed"
         description="Your WETH to NEAR cross-chain swap has been successfully processed"
         showCloseButton={false}
+      />
+
+      <TransactionSuccessModal
+        isOpen={isSuccessModalOpen}
+        onClose={() => {
+          setIsSuccessModalOpen(false);
+          // Reset transaction details
+          setTransactionDetails({});
+        }}
+        polygonTxHash={transactionDetails.polygonTxHash}
+        nearTxHash={transactionDetails.nearTxHash}
       />
     </div>
   );

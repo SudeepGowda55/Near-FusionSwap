@@ -59,6 +59,8 @@ export const CrossChainDetailsModal = ({
     if (isNearToEvm) {
       setReceiverAddress(HARDCODED_ACCOUNT.address);
     }
+    // Always set the hardcoded NEAR account ID for test account
+    setNearAccountId("goldrogerswap.testnet");
     setErrors({});
   };
 
@@ -68,7 +70,7 @@ export const CrossChainDetailsModal = ({
     setShowManualEntry(true);
     setPrivateKey("");
     setReceiverAddress("");
-    setNearAccountId("");
+    setNearAccountId(""); // Reset to empty so user can enter their own
     setErrors({});
     setShowPrivateKey(false);
   };
@@ -163,7 +165,14 @@ export const CrossChainDetailsModal = ({
         nearAccountId: nearAccountId.trim()
       });
       
-      // Reset form
+      // Don't reset form while processing to keep modal open
+      // Reset will happen when modal is closed after completion
+    }
+  };
+
+  const handleClose = () => {
+    // Only allow closing if not processing
+    if (!isProcessing) {
       setPrivateKey("");
       setReceiverAddress("");
       setNearAccountId("");
@@ -171,25 +180,15 @@ export const CrossChainDetailsModal = ({
       setShowPrivateKey(false);
       setUseHardcodedAccount(false);
       setShowManualEntry(false);
+      onClose();
     }
-  };
-
-  const handleClose = () => {
-    setPrivateKey("");
-    setReceiverAddress("");
-    setNearAccountId("");
-    setErrors({});
-    setShowPrivateKey(false);
-    setUseHardcodedAccount(false);
-    setShowManualEntry(false);
-    onClose();
   };
 
   // Determine if we should show the form fields
   const showFormFields = useHardcodedAccount || showManualEntry;
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={isProcessing ? undefined : handleClose}>
       <DialogContent className="sm:max-w-lg bg-card border-border">
         <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <div>
@@ -204,7 +203,8 @@ export const CrossChainDetailsModal = ({
             variant="ghost"
             size="icon"
             onClick={handleClose}
-            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+            disabled={isProcessing}
+            className="h-6 w-6 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -390,12 +390,16 @@ export const CrossChainDetailsModal = ({
                       value={nearAccountId}
                       onChange={(e) => setNearAccountId(e.target.value)}
                       className={`bg-swap-input border-border ${errors.nearAccountId ? 'border-red-500' : ''}`}
+                      readOnly={useHardcodedAccount}
                     />
                     {errors.nearAccountId && (
                       <p className="text-red-500 text-xs">{errors.nearAccountId}</p>
                     )}
                     <p className="text-muted-foreground text-xs">
-                      Your NEAR account ID (e.g., account.testnet or account.near)
+                      {useHardcodedAccount
+                        ? "Using pre-configured test NEAR account"
+                        : "Your NEAR account ID (e.g., account.testnet or account.near)"
+                      }
                     </p>
                   </div>
                 </>
@@ -413,12 +417,16 @@ export const CrossChainDetailsModal = ({
                     value={nearAccountId}
                     onChange={(e) => setNearAccountId(e.target.value)}
                     className={`bg-swap-input border-border ${errors.nearAccountId ? 'border-red-500' : ''}`}
+                    readOnly={useHardcodedAccount}
                   />
                   {errors.nearAccountId && (
                     <p className="text-red-500 text-xs">{errors.nearAccountId}</p>
                   )}
                   <p className="text-muted-foreground text-xs">
-                    NEAR account where you&apos;ll receive the swapped tokens
+                    {useHardcodedAccount
+                      ? "Using pre-configured test NEAR account: goldrogerswap.testnet"
+                      : "NEAR account where you'll receive the swapped tokens"
+                    }
                   </p>
                 </div>
               )}
