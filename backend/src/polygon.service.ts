@@ -57,8 +57,7 @@ export class PolygonService {
     const deployer = new SignerWallet(cnf.ownerPrivateKey, provider);
 
     let escrowFactory: string;
-
-    if (!Constants.POLYGON_ESCROW_FACTORY) {
+    if (Constants.POLYGON_ESCROW_FACTORY) {
       escrowFactory = Constants.POLYGON_ESCROW_FACTORY;
     } else {
       // deploy EscrowFactory
@@ -83,7 +82,7 @@ export class PolygonService {
     }
 
     let resolver: string;
-    if (!Constants.POLYGON_RESOLVER_CONTRACT_ADDRESS) {
+    if (Constants.POLYGON_RESOLVER_CONTRACT_ADDRESS) {
       resolver = Constants.POLYGON_RESOLVER_CONTRACT_ADDRESS;
     } else {
       // deploy Resolver contract
