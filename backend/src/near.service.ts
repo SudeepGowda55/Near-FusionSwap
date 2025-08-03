@@ -1,4 +1,3 @@
-
 import { Injectable } from '@nestjs/common';
 import { connect, Contract, keyStores, KeyPair } from 'near-api-js';
 import * as crypto from 'crypto';
@@ -14,9 +13,11 @@ console.info = originalConsoleInfo;
 
 console.info = (...args) => {
   const message = args.join(' ');
-  if (!message.includes('Receipt:') && 
-      !message.includes('Log [flexlock-1inch.testnet]:') &&
-      !message.includes('Receipts:')) {
+  if (
+    !message.includes('Receipt:') &&
+    !message.includes('Log [flexlock-1inch.testnet]:') &&
+    !message.includes('Receipts:')
+  ) {
     originalConsoleInfo(...args);
   }
 };
@@ -37,8 +38,10 @@ const RESOLVER_ACCOUNT = 'htlc.testnet';
 const MAKER_ACCOUNT = 'goldrogerswap.testnet';
 
 // Real private keys from the provided JSON files
-const RESOLVER_PRIVATE_KEY = 'ed25519:4f531FqBKzMKTPhzaAntW2Jciq3hFFEEUxKgRCfQU9hn8kUnVvjw17MZSwvgVfLkTgbBwJ3iB9GzmUER7J5FQGmL';
-const MAKER_PRIVATE_KEY = 'ed25519:qE5dhFpxEoye4RwTxHrrUUKC8HTgY7xA1bND7WhBrXksEDaJoykLzZTwhLWNwm5AUVoP8bJfmefhUiAmYD8QkJi';
+const RESOLVER_PRIVATE_KEY =
+  'ed25519:4f531FqBKzMKTPhzaAntW2Jciq3hFFEEUxKgRCfQU9hn8kUnVvjw17MZSwvgVfLkTgbBwJ3iB9GzmUER7J5FQGmL';
+const MAKER_PRIVATE_KEY =
+  'ed25519:qE5dhFpxEoye4RwTxHrrUUKC8HTgY7xA1bND7WhBrXksEDaJoykLzZTwhLWNwm5AUVoP8bJfmefhUiAmYD8QkJi';
 
 // Contract interface
 interface HTLCContract extends Contract {
@@ -61,8 +64,14 @@ interface HTLCContract extends Contract {
     gas?: string;
     amount?: string;
   }) => Promise<any>;
-  claim: (params: { signerAccount: any; args: { htlc_id: string; secret: string } }) => Promise<any>;
-  refund: (params: { signerAccount: any; args: { htlc_id: string } }) => Promise<any>;
+  claim: (params: {
+    signerAccount: any;
+    args: { htlc_id: string; secret: string };
+  }) => Promise<any>;
+  refund: (params: {
+    signerAccount: any;
+    args: { htlc_id: string };
+  }) => Promise<any>;
   get_htlc_details: (args: { htlc_id: string }) => Promise<any>;
 }
 
@@ -99,19 +108,27 @@ export class NearService {
     if (this.contract) return;
 
     console.log('🔧 Initializing NEAR service with real testnet accounts...');
-    
+
     try {
       // Create key pairs from the provided private keys
       const resolverKeyPair = KeyPair.fromString(RESOLVER_PRIVATE_KEY);
       const makerKeyPair = KeyPair.fromString(MAKER_PRIVATE_KEY);
-      
+
       // Store keys in keystore
-      await NEAR_CONFIG.keyStore.setKey(NEAR_CONFIG.networkId, RESOLVER_ACCOUNT, resolverKeyPair);
-      await NEAR_CONFIG.keyStore.setKey(NEAR_CONFIG.networkId, MAKER_ACCOUNT, makerKeyPair);
-      
+      await NEAR_CONFIG.keyStore.setKey(
+        NEAR_CONFIG.networkId,
+        RESOLVER_ACCOUNT,
+        resolverKeyPair,
+      );
+      await NEAR_CONFIG.keyStore.setKey(
+        NEAR_CONFIG.networkId,
+        MAKER_ACCOUNT,
+        makerKeyPair,
+      );
+
       // Initialize NEAR connection with proper configuration
       this.near = await connect(NEAR_CONFIG);
-      
+
       // Create accounts with the real keys
       this.resolverAccount = await this.near.account(RESOLVER_ACCOUNT);
       this.makerAccount = await this.near.account(MAKER_ACCOUNT);
@@ -122,7 +139,9 @@ export class NearService {
         changeMethods: ['new_htlc', 'claim', 'refund'],
       }) as HTLCContract;
 
-      console.log('✅ NEAR contract service initialized with real testnet accounts');
+      console.log(
+        '✅ NEAR contract service initialized with real testnet accounts',
+      );
       console.log('📋 Contract ID:', CONTRACT_ID);
       console.log('👤 Resolver Account:', RESOLVER_ACCOUNT);
       console.log('👤 Maker Account:', MAKER_ACCOUNT);
@@ -137,12 +156,15 @@ export class NearService {
     // Generate a proper hex secret (32 bytes = 64 hex chars)
     const secret = crypto.randomBytes(32).toString('hex');
     // Hash the BINARY representation of the hex secret
-    const hash = crypto.createHash('sha256').update(Buffer.from(secret, 'hex')).digest('hex');
-    
+    const hash = crypto
+      .createHash('sha256')
+      .update(Buffer.from(secret, 'hex'))
+      .digest('hex');
+
     // Store for later use
     this.currentSecret = secret;
     this.currentHash = hash;
-    
+
     return { secret, hash };
   }
 
@@ -166,20 +188,19 @@ export class NearService {
     maker: string = MAKER_ACCOUNT,
     resolver: string = RESOLVER_ACCOUNT,
     amount: string = '1000000000000000000000000',
-    hashlock?: string
+    hashlock?: string,
   ): Promise<SrcEscrowResult> {
     console.log('🔹 Creating HTLC on NEAR (source chain)...');
     await this.initialize();
-    
+
     // Remove '0x' prefix from hashlock if present for NEAR contract compatibility
-    const cleanHashlock = hashlock && hashlock.startsWith('0x') 
-      ? hashlock.slice(2) 
-      : hashlock;
-    
+    const cleanHashlock =
+      hashlock && hashlock.startsWith('0x') ? hashlock.slice(2) : hashlock;
+
     const { secret, hash } = cleanHashlock
       ? { secret: '', hash: cleanHashlock }
       : this.generateSecretHash();
-    
+
     const timelocks = this.calculateTimelocks();
     const htlcId = `source_htlc_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
@@ -192,7 +213,7 @@ export class NearService {
       hashlock: hash,
       timelocks: timelocks,
       is_destination: false, // This is source chain
-      partial_secrets_hex: null
+      partial_secrets_hex: null,
     };
 
     console.log('📋 HTLC Parameters:', JSON.stringify(htlcParams, null, 2));
@@ -211,7 +232,7 @@ export class NearService {
         signerAccount: this.makerAccount,
         args: htlcParams,
         gas: '300000000000000', // Gas limit
-        amount: amount // Deposit amount
+        amount: amount, // Deposit amount
       });
 
       console.log('✅ Source HTLC deployed successfully:', result);
@@ -222,7 +243,8 @@ export class NearService {
         hash: hash,
         timelocks: timelocks,
         result: result,
-        message: 'HTLC created on NEAR (source chain) - User SENDS NEAR → Resolver RECEIVES NEAR'
+        message:
+          'HTLC created on NEAR (source chain) - User SENDS NEAR → Resolver RECEIVES NEAR',
       };
     } catch (error) {
       console.error('❌ Failed to deploy src escrow:', error);
@@ -235,20 +257,45 @@ export class NearService {
     resolver: string = RESOLVER_ACCOUNT,
     maker: string = MAKER_ACCOUNT,
     amount: string = '1000000000000000000000000',
-    hashlock?: string
+    hashlock?: string,
   ): Promise<DestEscrowResult> {
     console.log('🔹 Creating HTLC on NEAR (destination chain)...');
     await this.initialize();
-    
+
+    // Clean and validate the amount parameter
+    let cleanAmount = amount;
+    if (typeof amount !== 'string') {
+      cleanAmount = String(amount);
+    }
+
+    // Remove any non-numeric characters except decimal points
+    cleanAmount = cleanAmount.replace(/[^\d.]/g, '');
+
+    // If it contains a decimal, convert to wei equivalent for NEAR (24 decimals)
+    if (cleanAmount.includes('.')) {
+      const parts = cleanAmount.split('.');
+      const integerPart = parts[0] || '0';
+      const decimalPart = (parts[1] || '').padEnd(24, '0').slice(0, 24);
+      cleanAmount = integerPart + decimalPart;
+    }
+
+    // Ensure it's a valid number string
+    if (!/^\d+$/.test(cleanAmount)) {
+      console.error('❌ Invalid amount format:', amount);
+      cleanAmount = '1000000000000000000000000'; // Fallback to default
+    }
+
+    console.log('💰 Original amount:', amount);
+    console.log('💰 Cleaned amount:', cleanAmount);
+
     // Remove '0x' prefix from hashlock if present for NEAR contract compatibility
-    const cleanHashlock = hashlock && hashlock.startsWith('0x') 
-      ? hashlock.slice(2) 
-      : hashlock;
-    
+    const cleanHashlock =
+      hashlock && hashlock.startsWith('0x') ? hashlock.slice(2) : hashlock;
+
     const { secret, hash } = cleanHashlock
       ? { secret: this.currentSecret, hash: cleanHashlock }
       : this.generateSecretHash();
-    
+
     const timelocks = this.calculateTimelocks();
     const htlcId = `dest_htlc_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
@@ -261,11 +308,11 @@ export class NearService {
       hashlock: hash,
       timelocks: timelocks,
       is_destination: true, // This is destination chain
-      partial_secrets_hex: null
+      partial_secrets_hex: null,
     };
 
     console.log('📋 HTLC Parameters:', JSON.stringify(htlcParams, null, 2));
-    console.log('💰 Deposit amount:', amount);
+    console.log('💰 Deposit amount:', cleanAmount);
     console.log('🔐 Secret (hex):', secret);
     console.log('🔑 Hash:', hash);
 
@@ -288,19 +335,20 @@ export class NearService {
         signerAccount: this.resolverAccount,
         args: htlcParams,
         gas: '300000000000000', // Gas limit
-        amount: amount // Deposit amount
+        amount: cleanAmount, // Use cleaned amount
       });
 
       // Use the captured hash instead of fallback
-      const transactionHash = capturedTransactionHash || `fallback_${htlcId}_${Date.now()}`;
-      
+      const transactionHash =
+        capturedTransactionHash || `fallback_${htlcId}_${Date.now()}`;
+
       console.log('🔍 Full result object:', JSON.stringify(result, null, 2));
       console.log('🔍 Result type:', typeof result);
       console.log('🔍 Captured transaction hash:', capturedTransactionHash);
       console.log('🔍 Final transaction hash:', transactionHash);
 
       const nearExplorerUrl = `https://explorer.testnet.near.org/transactions/${transactionHash}`;
-      
+
       console.log('✅ Destination HTLC deployed successfully!');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('🔗 **REAL TRANSACTION HASH:**', transactionHash);
@@ -316,9 +364,9 @@ export class NearService {
         result: result,
         transaction_hash: transactionHash, // Now using the real hash!
         explorer_url: nearExplorerUrl,
-        message: 'HTLC created on NEAR (destination chain) - Resolver SENDS NEAR → User RECEIVES NEAR'
+        message:
+          'HTLC created on NEAR (destination chain) - Resolver SENDS NEAR → User RECEIVES NEAR',
       };
-
     } catch (error) {
       console.error('❌ Failed to deploy dest escrow:', error);
       throw new Error(`Destination escrow deployment failed: ${error.message}`);
@@ -329,10 +377,15 @@ export class NearService {
   }
 
   // Real implementation for claiming on source escrow
-  public async srcEscrowWithdraw(htlcId?: string, secret?: string): Promise<HTLCResponse> {
-    console.log('🔹 User (goldrogerswap.testnet) claiming from their own source escrow...');
+  public async srcEscrowWithdraw(
+    htlcId?: string,
+    secret?: string,
+  ): Promise<HTLCResponse> {
+    console.log(
+      '🔹 User (goldrogerswap.testnet) claiming from their own source escrow...',
+    );
     await this.initialize();
-    
+
     const claimHtlcId = htlcId || `source_claim_${Date.now()}`;
     let claimSecret = secret || this.currentSecret;
 
@@ -365,20 +418,26 @@ export class NearService {
         if (message.startsWith('Receipts: ')) {
           const receipts = message.replace('Receipts: ', '').split(', ');
           capturedTransactionHash = receipts[0].trim();
-          originalLog('🎯 Captured claim transaction hash:', capturedTransactionHash);
+          originalLog(
+            '🎯 Captured claim transaction hash:',
+            capturedTransactionHash,
+          );
         }
         originalLog(...args);
       };
 
-      const result = await userContract.claim({ 
+      const result = await userContract.claim({
         signerAccount: this.makerAccount,
-        args: { htlc_id: claimHtlcId, secret: claimSecret }
+        args: { htlc_id: claimHtlcId, secret: claimSecret },
       });
 
-      const transactionHash = capturedTransactionHash || `fallback_${claimHtlcId}_${Date.now()}`;
+      const transactionHash =
+        capturedTransactionHash || `fallback_${claimHtlcId}_${Date.now()}`;
       const nearExplorerUrl = `https://explorer.testnet.near.org/transactions/${transactionHash}`;
 
-      console.log('✅ Source escrow claim successful - User received their own NEAR tokens back');
+      console.log(
+        '✅ Source escrow claim successful - User received their own NEAR tokens back',
+      );
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('🔗 **CLAIM TRANSACTION HASH:**', transactionHash);
       console.log('🔗 **NEAR EXPLORER:**', nearExplorerUrl);
@@ -391,10 +450,11 @@ export class NearService {
         secret: claimSecret,
         hash: this.currentHash,
         contract_address: CONTRACT_ID,
-        message: 'User claimed NEAR tokens from source escrow - Phase 2 complete',
+        message:
+          'User claimed NEAR tokens from source escrow - Phase 2 complete',
         status: 'success',
         transaction_hash: transactionHash,
-        explorer_url: nearExplorerUrl
+        explorer_url: nearExplorerUrl,
       };
     } catch (error) {
       console.error('❌ Failed to claim source escrow:', error);
@@ -406,10 +466,13 @@ export class NearService {
   }
 
   // Real implementation for claiming on destination escrow
-  public async destEscrowWithdraw(htlcId?: string, secret?: string): Promise<HTLCResponse> {
+  public async destEscrowWithdraw(
+    htlcId?: string,
+    secret?: string,
+  ): Promise<HTLCResponse> {
     console.log('🔹 User (Final Recipient) claiming NEAR tokens...');
     await this.initialize();
-    
+
     const claimHtlcId = htlcId || `dest_claim_${Date.now()}`;
     let claimSecret = secret || this.currentSecret;
 
@@ -443,20 +506,24 @@ export class NearService {
           // Take the first receipt hash as the transaction hash
           const receipts = message.replace('Receipts: ', '').split(', ');
           capturedTransactionHash = receipts[0].trim();
-          originalLog('🎯 Captured claim transaction hash:', capturedTransactionHash);
+          originalLog(
+            '🎯 Captured claim transaction hash:',
+            capturedTransactionHash,
+          );
         }
         originalLog(...args);
       };
 
-      const result = await makerContract.claim({ 
+      const result = await makerContract.claim({
         signerAccount: this.makerAccount,
-        args: { htlc_id: claimHtlcId, secret: claimSecret }
+        args: { htlc_id: claimHtlcId, secret: claimSecret },
       });
 
-      const transactionHash = capturedTransactionHash || `fallback_${claimHtlcId}_${Date.now()}`;
-      
+      const transactionHash =
+        capturedTransactionHash || `fallback_${claimHtlcId}_${Date.now()}`;
+
       const nearExplorerUrl = `https://explorer.testnet.near.org/transactions/${transactionHash}`;
-      
+
       console.log('✅ Destination escrow claim successful');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('🔗 **REAL TRANSACTION HASH:**', transactionHash);
@@ -470,10 +537,11 @@ export class NearService {
         secret: claimSecret,
         hash: this.currentHash,
         contract_address: CONTRACT_ID,
-        message: 'User claimed NEAR tokens and revealed secret - Resolver can now claim on source chain',
+        message:
+          'User claimed NEAR tokens and revealed secret - Resolver can now claim on source chain',
         status: 'success',
         transaction_hash: transactionHash,
-        explorer_url: nearExplorerUrl
+        explorer_url: nearExplorerUrl,
       };
     } catch (error) {
       console.error('❌ Failed to claim destination escrow:', error);
@@ -488,13 +556,13 @@ export class NearService {
   public async cancel(htlcId?: string): Promise<HTLCResponse> {
     console.log('🔹 Cancelling HTLC order...');
     await this.initialize();
-    
+
     const cancelHtlcId = htlcId || `cancelled_${Date.now()}`;
 
     try {
-      const result = await this.contract!.refund({ 
+      const result = await this.contract!.refund({
         signerAccount: this.resolverAccount,
-        args: { htlc_id: cancelHtlcId }
+        args: { htlc_id: cancelHtlcId },
       });
 
       console.log('✅ HTLC cancellation successful');
@@ -505,7 +573,7 @@ export class NearService {
         hash: 'cancelled',
         contract_address: CONTRACT_ID,
         message: 'Order cancelled by maker',
-        status: 'cancelled'
+        status: 'cancelled',
       };
     } catch (error) {
       console.error('❌ Failed to cancel HTLC:', error);
@@ -517,9 +585,11 @@ export class NearService {
   public async getHTLCDetails(htlcId: string): Promise<any> {
     console.log('🔍 Querying HTLC details...');
     await this.initialize();
-    
+
     try {
-      const details = await this.contract!.get_htlc_details({ htlc_id: htlcId });
+      const details = await this.contract!.get_htlc_details({
+        htlc_id: htlcId,
+      });
       console.log('✅ HTLC details retrieved');
       return details;
     } catch (error) {

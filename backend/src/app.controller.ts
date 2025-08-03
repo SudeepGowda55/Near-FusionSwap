@@ -110,7 +110,7 @@ export class AppController {
       // Convert amount to yoctoNEAR (1 NEAR = 10^24 yoctoNEAR)
       const { parseUnits } = await import('ethers');
       const nearAmountInYocto = parseUnits(
-        createOrderDto.takingAmount.toString(),
+        createOrderDto.makingAmount.toString(),
         24,
       );
       console.log('💰 Amount in yoctoNEAR:', nearAmountInYocto.toString());
@@ -157,11 +157,7 @@ export class AppController {
         dstDeployedAt,
         dstEscrowAddress,
       );
-      console.log('✅ NEAR src withdraw completed:', srcWithdraw);
 
-      console.log(
-        '⏭️ Skipping Polygon destination withdrawal (no dest escrow deployed)',
-      );
       console.log('🎉 NEAR to Polygon swap completed successfully!');
 
       return {
