@@ -5,7 +5,7 @@ import * as Sdk from '@1inch/cross-chain-sdk';
 import { Address, LimitOrderV4Struct, NetworkEnum } from '@1inch/fusion-sdk';
 import * as Constants from './constants';
 import { CreateOrderDto } from './dto/order.dto';
-import { MaxUint256, parseEther, parseUnits } from 'ethers';
+import { parseEther, parseUnits } from 'ethers';
 import { Wallet } from './wallet';
 import { ChainConfig, config } from './polygon/config';
 import { getProvider } from './utils';
@@ -36,11 +36,11 @@ export class OrderService {
     const srcTimestamp = BigInt((await provider.getBlock('latest'))!.timestamp);
 
     // NEED to handle from frontend
-    await makerWallet.approveToken(
-      createOrderdto.makerAssetAddress,
-      config.chain.polygon.limitOrderProtocol,
-      MaxUint256,
-    );
+    // await makerWallet.approveToken(
+    //   createOrderdto.makerAssetAddress,
+    //   config.chain.polygon.limitOrderProtocol,
+    //   MaxUint256,
+    // );
 
     const order = Sdk.CrossChainOrder.new(
       new Address(escrowFactory),
@@ -49,11 +49,11 @@ export class OrderService {
         maker: new Address(await makerWallet.getAddress()),
         makingAmount: parseUnits(
           `${createOrderdto.makingAmount}`,
-          createOrderdto.makerAssetDecimals,
+          createOrderdto.makerAssetDecimals || 18, // Default to 18 decimals if not provided
         ),
         takingAmount: parseUnits(
           `${createOrderdto.takingAmount}`,
-          createOrderdto.takerAssetDecimals,
+          createOrderdto.takerAssetDecimals || 6, // Default to 6 decimals if not provided
         ),
         makerAsset: new Address(createOrderdto.makerAssetAddress), // Source chain asset
         takerAsset: new Address(createOrderdto.takerAssetAddress), // Destination chain asset
@@ -70,7 +70,7 @@ export class OrderService {
           dstCancellation: 101n, // 1sec public withdrawal
         }),
         srcChainId: createOrderdto.srcChainId,
-        dstChainId: createOrderdto.destChainId,
+        dstChainId: createOrderdto.destChainId || 1, // Use default if not provided
         srcSafetyDeposit: parseEther('0.00001'),
         dstSafetyDeposit: parseEther('0.00001'),
       },

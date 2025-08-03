@@ -43,6 +43,9 @@ export class AppController {
       // TODO add function to validate balances
       const secret = this.orderService.getOrderSecret();
 
+      console.log('Waiting for 10 seconds before withdrawing funds...');
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+
       await this.polygonService.srcEscrowWithdraw(srcEscrowEvent, secret);
       console.log('Polygon src withdraw completed');
 
@@ -53,7 +56,8 @@ export class AppController {
         success: true,
         message: 'Swap from Polygon to NEAR successfully',
         data: {
-          order,
+          orderHash,
+          hashLock,
           secret,
         },
       };
@@ -88,21 +92,23 @@ export class AppController {
         await this.polygonService.deployDestEscrow(order, hashLock);
       console.log('Polygon dest escrow deployed');
 
+      console.log('Waiting for 10 seconds before withdrawing funds...');
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+
       const srcWithdraw = await this.nearService.srcEscrowWithdraw();
       console.log('NEAR src withdraw:', srcWithdraw);
 
-      await this.polygonService.destEscrowWithdraw(
-        newDstImmutables,
-        newDstImmutablesComplement,
-        secret,
-        dstDeployedAt,
-      );
+      // await this.polygonService.destEscrowWithdraw(
+      //   newDstImmutables,
+      //   newDstImmutablesComplement,
+      //   secret,
+      //   dstDeployedAt,
+      // );
 
       return {
         success: true,
         message: 'Swap from NEAR to Polygon initiated successfully',
         data: {
-          order,
           secret,
         },
       };

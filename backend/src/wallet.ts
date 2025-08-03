@@ -143,10 +143,11 @@ export class Wallet {
     const receipt = await res.wait(1);
 
     if (receipt && receipt.status) {
+      const block = await this.provider.getBlock(receipt.blockNumber);
       return {
         txHash: receipt.hash,
-        blockTimestamp: BigInt((await res.getBlock())!.timestamp),
-        blockHash: res.blockHash as string,
+        blockTimestamp: BigInt(block!.timestamp),
+        blockHash: receipt.blockHash,
       };
     }
 

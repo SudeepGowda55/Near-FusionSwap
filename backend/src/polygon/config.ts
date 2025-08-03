@@ -1,4 +1,5 @@
 import { NetworkEnum } from '@1inch/fusion-sdk';
+import 'dotenv/config';
 
 const fromEnv = {
   SRC_CHAIN_RPC: 'https://eth.merkle.io',
@@ -51,6 +52,7 @@ export const config = {
       limitOrderProtocol: '0x111111125421ca6dc452d289314280a0f8842a65',
       wrappedNative: '0x7ceb23fd6bc0add59e62ac25578270cff1b9f619',
       ownerPrivateKey:
+        process.env.POLYGON_RESOLVER_PRIVATE_KEY ||
         '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
       tokens: {
         WETH: {

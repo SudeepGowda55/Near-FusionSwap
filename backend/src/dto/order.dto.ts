@@ -44,8 +44,8 @@ export class CreateOrderDto {
   takerAssetAddress: string;
   makingAmount: number;
   takingAmount: number;
-  makerAssetDecimals: number = 18;
-  takerAssetDecimals: number = 18;
+  makerAssetDecimals: number;
+  takerAssetDecimals: number;
   makerEvmAddress: string;
   makerNearAccountId: string;
 }

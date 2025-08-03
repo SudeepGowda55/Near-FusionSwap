@@ -17,8 +17,11 @@ import { Resolver } from './polygon/resolver';
 import { OrderDto } from './dto/order.dto';
 import { getProvider } from './utils';
 import { Chain } from './polygon/types';
+import * as Constants from './constants';
+import 'dotenv/config';
 
 const polygonResolverPk =
+  process.env.POLYGON_RESOLVER_PRIVATE_KEY ||
   '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a';
 
 @Injectable()
@@ -28,7 +31,6 @@ export class PolygonService {
   src: Chain;
   resolver: Wallet;
   contractFactory: EscrowFactory;
-  dstResolverContract: Wallet;
   srcTimestamp: bigint;
 
   public async initialize() {
@@ -39,18 +41,10 @@ export class PolygonService {
       this.src.provider,
       this.src.escrowFactory,
     );
-    this.dstResolverContract = await Wallet.fromAddress(
-      this.src.resolver,
-      this.src.provider,
-    );
 
     this.srcTimestamp = BigInt(
       (await this.src.provider.getBlock('latest'))!.timestamp,
     );
-  }
-
-  public async increaseTime(t: number): Promise<void> {
-    await this.src.provider.send('evm_increaseTime', [t]);
   }
 
   public async initChain(cnf: ChainConfig): Promise<{
@@ -62,38 +56,53 @@ export class PolygonService {
     const { node, provider } = await getProvider(cnf);
     const deployer = new SignerWallet(cnf.ownerPrivateKey, provider);
 
-    // deploy EscrowFactory
-    const escrowFactory = await this.deploy(
-      factoryContract,
-      [
-        cnf.limitOrderProtocol,
-        cnf.wrappedNative, // feeToken,
-        Address.fromBigInt(0n).toString(), // accessToken,
-        deployer.address, // owner
-        60 * 30, // src rescue delay
-        60 * 30, // dst rescue delay
-      ],
-      provider,
-      deployer,
-    );
-    console.log(
-      `[${cnf.chainId}]`,
-      `Escrow factory contract deployed to`,
-      escrowFactory,
-    );
+    let escrowFactory: string;
 
-    // deploy Resolver contract
-    const resolver = await this.deploy(
-      resolverContract,
-      [
+    if (Constants.POLYGON_ESCROW_FACTORY) {
+      escrowFactory = Constants.POLYGON_ESCROW_FACTORY;
+    } else {
+      // deploy EscrowFactory
+      escrowFactory = await this.deploy(
+        factoryContract,
+        [
+          cnf.limitOrderProtocol,
+          cnf.wrappedNative, // feeToken,
+          Address.fromBigInt(0n).toString(), // accessToken,
+          deployer.address, // owner
+          60 * 30, // src rescue delay
+          60 * 30, // dst rescue delay
+        ],
+        provider,
+        deployer,
+      );
+      console.log(
+        `[${cnf.chainId}]`,
+        `Escrow factory contract deployed to`,
         escrowFactory,
-        cnf.limitOrderProtocol,
-        computeAddress(polygonResolverPk), // white listed resolver
-      ],
-      provider,
-      deployer,
-    );
-    console.log(`[${cnf.chainId}]`, `Resolver contract deployed to`, resolver);
+      );
+    }
+
+    let resolver: string;
+    if (Constants.POLYGON_RESOLVER_CONTRACT_ADDRESS) {
+      resolver = Constants.POLYGON_RESOLVER_CONTRACT_ADDRESS;
+    } else {
+      // deploy Resolver contract
+      resolver = await this.deploy(
+        resolverContract,
+        [
+          escrowFactory,
+          cnf.limitOrderProtocol,
+          computeAddress(polygonResolverPk), // white listed resolver
+        ],
+        provider,
+        deployer,
+      );
+      console.log(
+        `[${cnf.chainId}]`,
+        `Resolver contract deployed to`,
+        resolver,
+      );
+    }
 
     return { node: node, provider, resolver, escrowFactory };
   }
@@ -162,8 +171,6 @@ export class PolygonService {
     const srcEscrowEvent =
       await this.contractFactory.getSrcDeployEvent(srcDeployBlock);
 
-    await this.increaseTime(11);
-
     return srcEscrowEvent;
   }
 
@@ -175,21 +182,25 @@ export class PolygonService {
     newDstImmutablesComplement: Sdk.DstImmutablesComplement;
     dstDeployedAt: bigint;
   }> {
-    await this.dstResolverContract.topUpFromDonor(
-      config.chain.polygon.tokens.WETH.address, // Polygon WETH
-      config.chain.polygon.tokens.WETH.donor,
-      parseEther('0.00001'), // 0.00001 WETH
-    );
-
-    // Transfer 1 MATIC to resolver contract for gas
-    await this.resolver.transfer(
-      await this.dstResolverContract.getAddress(),
-      parseEther('1'),
-    );
-
-    await this.dstResolverContract.unlimitedApprove(
+    // Transfer WETH from resolver wallet to resolver contract
+    await this.resolver.transferToken(
       config.chain.polygon.tokens.WETH.address,
-      this.src.escrowFactory,
+      this.src.resolver,
+      parseEther('0.000001'),
+    );
+
+    // Transfer MATIC to resolver contract for gas
+    await this.resolver.transfer(this.src.resolver, parseEther('0.01'));
+
+    const resolverContractInstance = new Resolver('', this.src.resolver);
+
+    await this.resolver.send(
+      resolverContractInstance.approveToken(
+        config.chain.polygon.tokens.WETH.address,
+        this.src.escrowFactory,
+        parseEther('999999'), // Large approval amount
+        'dst',
+      ),
     );
 
     // Build destination immutables from orderData input
@@ -211,8 +222,6 @@ export class PolygonService {
       safetyDeposit: newDstImmutables.safetyDeposit,
     });
 
-    const resolverContractInstance = new Resolver('', this.src.resolver);
-
     console.log(
       `[${this.chainId}]`,
       `Depositing ${newDstImmutables.amount} for order ${orderData.orderHash}`,
@@ -225,8 +234,6 @@ export class PolygonService {
     console.log(
       `[${this.chainId}] Deployed Dst Escrow Contract in polygon with tx ${dstDepositHash}`,
     );
-
-    await this.increaseTime(11);
 
     return {
       newDstImmutables,

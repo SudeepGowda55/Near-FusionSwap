@@ -88,4 +88,20 @@ export class Resolver {
       ]),
     };
   }
+
+  public approveToken(
+    token: string,
+    spender: string,
+    amount: bigint,
+    side: 'src' | 'dst' = 'dst'
+  ): TransactionRequest {
+    return {
+      to: side === 'src' ? this.srcAddress : this.dstAddress,
+      data: this.iface.encodeFunctionData('approveToken', [
+        token,
+        spender,
+        amount,
+      ]),
+    };
+  }
 }
