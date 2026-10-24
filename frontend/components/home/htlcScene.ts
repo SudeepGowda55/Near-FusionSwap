@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-/** p runs 0 → 5: hero, intent, source lock, destination lock, reveal, settled. px/py: pointer in [-1, 1]. */
+/** p runs 0 → 4: hero, intent, source lock, destination lock, reveal. px/py: pointer in [-1, 1]. */
 export type HtlcStore = { p: number; px: number; py: number };
 
 const ss = (a: number, b: number, x: number) => {
@@ -279,8 +279,7 @@ export function createHtlcScene(canvas: HTMLCanvasElement, store: HtlcStore, onF
     const intent = ss(0.5, 1.2, p);
     const srcLock = ss(1.5, 2.2, p);
     const dstLock = ss(2.5, 3.2, p);
-    const reveal = ss(3.4, 4.1, p);
-    const settle = ss(4.35, 5, p);
+    const reveal = ss(3.3, 3.9, p);
 
     const vaults: [typeof src, number, number][] = [
       [src, srcLock, 0],
@@ -291,19 +290,19 @@ export function createHtlcScene(canvas: HTMLCanvasElement, store: HtlcStore, onF
       const wob = Math.sin(t * 0.5 + i * 2) * 1.1;
       v.ringA.rotation.set(mix(wob, Math.PI / 2, lock), mix(t * 0.35 + i, 0, lock), 0);
       v.ringB.rotation.set(mix(-wob * 0.8, 0, lock), mix(t * 0.25 - i, Math.PI / 2, lock), mix(0.6, 0, lock));
-      const rs = mix(1.25, 0.82, lock) + settle * 0.9;
+      const rs = mix(1.25, 0.82, lock);
       v.ringA.scale.setScalar(rs);
       v.ringB.scale.setScalar(rs);
-      v.ringMat.opacity = (0.35 + lock * 0.6) * (1 - settle);
+      v.ringMat.opacity = 0.35 + lock * 0.6;
       v.crystal.rotation.y = t * (0.25 + open * 0.2) + i;
       v.crystal.rotation.x = Math.sin(t * 0.3 + i) * 0.3;
-      v.crystalMat.uniforms.uLock.value = lock * (1 - settle * 0.6);
-      // deposit: token drops into the vault when it locks, rises out to its new owner on settle
-      v.token.position.y = (1 - lock) * 3.2 + settle * 1.4;
-      v.token.scale.setScalar(Math.max(0.001, lock * (1 - settle)));
+      v.crystalMat.uniforms.uLock.value = lock;
+      // deposit: token drops into the vault when it locks
+      v.token.position.y = (1 - lock) * 3.2;
+      v.token.scale.setScalar(Math.max(0.001, lock));
       // timelock: dial appears with the lock and drains until the secret lands
-      v.dialMat.uniforms.uOpacity.value = lock * (1 - settle);
-      v.dialMat.uniforms.uProgress.value = 1 - 0.55 * ss(i === 0 ? 1.5 : 2.5, 4.1, p);
+      v.dialMat.uniforms.uOpacity.value = lock;
+      v.dialMat.uniforms.uProgress.value = 1 - 0.55 * ss(i === 0 ? 1.5 : 2.5, 3.9, p);
     }
 
     secret.visible = reveal < 0.999;
@@ -315,18 +314,17 @@ export function createHtlcScene(canvas: HTMLCanvasElement, store: HtlcStore, onF
     keys.forEach((k, i) => {
       bezier(0.5 + (i === 0 ? -0.5 : 0.5) * reveal, tmp);
       k.position.copy(tmp);
-      k.visible = reveal > 0.001 && settle < 0.999;
-      k.scale.setScalar(1 - settle);
+      k.visible = reveal > 0.001;
       k.rotation.y = t * 3;
     });
 
-    bridgeMat.uniforms.uIntensity.value = 0.25 + intent * 0.35 + (srcLock + dstLock) * 0.12 + settle * 0.35;
-    bridgeMat.uniforms.uSpread.value = 1 - (srcLock + dstLock) * 0.3 + settle * 0.8;
-    bridgeMat.uniforms.uReveal.value = reveal * (1 - settle);
+    bridgeMat.uniforms.uIntensity.value = 0.25 + intent * 0.35 + (srcLock + dstLock) * 0.12 + reveal * 0.2;
+    bridgeMat.uniforms.uSpread.value = 1 - (srcLock + dstLock) * 0.3;
+    bridgeMat.uniforms.uReveal.value = reveal;
 
     // camera leans toward whichever chain is acting in the current chapter
     const lean = -1.1 * (ss(1.3, 2, p) - ss(2.3, 2.9, p)) + 1.1 * (ss(2.3, 2.9, p) - ss(3.3, 3.9, p));
-    const z = portrait ? 12.5 : 12 - intent * 0.6 + settle * 0.8;
+    const z = portrait ? 12.5 : 12 - intent * 0.6;
     if (portrait) camera.position.set(cur.px * 0.4, -lean * 0.3, z);
     else camera.position.set(lean + cur.px * 0.7, 1.1 + cur.py * 0.4 + reveal * 0.4, z);
     camera.lookAt(portrait ? 0 : lean * 0.7, portrait ? -lean * 0.2 : 0.5, 0);

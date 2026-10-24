@@ -34,11 +34,6 @@ const CHAPTERS = [
     title: "One secret opens both.",
     body: "With both sides locked, the secret is revealed. The maker claims NEAR, and the same preimage lets the resolver claim WETH on Polygon.",
   },
-  {
-    tag: "Settled",
-    title: "Atomic, or nothing.",
-    body: "Both claims land, or the timelocks expire and each side is refunded. No bridge custody, no counterparty risk.",
-  },
 ];
 
 const LEGEND = [
@@ -75,13 +70,13 @@ export function Story() {
         scrollTrigger: { trigger: wrap.current, start: "top top", end: "bottom bottom", scrub: 0.8 },
         onUpdate: () => {
           setActive(Math.round(store.p));
-          const f = store.p / 5;
+          const f = store.p / 4;
           if (rail.current) rail.current.style.transform = `scaleY(${f})`;
           if (bar.current) bar.current.style.transform = `scaleX(${f})`;
         },
       })
-      .to(store, { p: 5, ease: "none", duration: 0.92 })
-      .to({}, { duration: 0.08 });
+      .to(store, { p: 4, ease: "none", duration: 0.9 })
+      .to({}, { duration: 0.1 });
 
     return () => {
       alive = false;
@@ -93,7 +88,7 @@ export function Story() {
   }, [store]);
 
   return (
-    <section ref={wrap} className="relative h-[620vh]" aria-label="How a cross-chain HTLC swap settles, told in five chapters">
+    <section ref={wrap} className="relative h-[480vh]" aria-label="How a cross-chain HTLC swap locks and unlocks, told in four chapters">
       <div className="sticky top-0 h-[100svh] overflow-hidden">
         <canvas
           ref={canvas}
@@ -179,7 +174,7 @@ export function Story() {
                 )}
               >
                 <p className="label mb-3">
-                  <span className="text-secret">0{i + 1}</span> / 05 · {c.tag}
+                  <span className="text-secret">0{i + 1}</span> / 04 · {c.tag}
                 </p>
                 <h2 className="mb-4 text-[clamp(2rem,4.6vw,3.6rem)] font-semibold leading-[0.98] tracking-[-0.03em]">
                   {c.title.split(" ").map((w, wi, arr) => (

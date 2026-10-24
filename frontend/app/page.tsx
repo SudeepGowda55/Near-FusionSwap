@@ -4,6 +4,22 @@ import { Facts } from "@/components/home/Facts";
 import { Kinetic } from "@/components/site/Motion";
 import { TransitionLink } from "@/components/site/Transition";
 
+// Deadlines per evm-near-fusion+/near/src/lib.rs and backend calculateTimelocks()
+const OUTCOMES = [
+  {
+    tag: "Secret revealed in time",
+    title: "Both sides claim.",
+    body: "The maker claims NEAR before the +30 min withdrawal deadline, and the same secret lets the resolver claim WETH on Polygon.",
+    tone: "text-near",
+  },
+  {
+    tag: "Secret never revealed",
+    title: "Everything refunds.",
+    body: "Nothing can be claimed without the secret. After the +1.5 h cancellation time, the resolver refunds the expired HTLC.",
+    tone: "text-polygon",
+  },
+];
+
 const NEXT = [
   {
     href: "/how-it-works",
@@ -32,6 +48,26 @@ export default function Home() {
   return (
     <>
       <Story />
+
+      <section className="mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-32">
+        <p className="label reveal mb-6">
+          <span className="text-secret">After the reveal</span> · settled
+        </p>
+        <Kinetic as="h2" text="Atomic, or nothing." className="mb-6 text-[clamp(2.6rem,7vw,6rem)] font-semibold leading-[0.92] tracking-[-0.04em]" />
+        <p className="reveal mb-14 max-w-2xl text-lg leading-relaxed text-muted-foreground">
+          Both claims land, or the timelocks expire and the funds go back. No bridge custody, no counterparty risk.
+        </p>
+        <div className="grid gap-px overflow-hidden rounded-2xl border border-border bg-border md:grid-cols-2">
+          {OUTCOMES.map((o, i) => (
+            <div key={o.title} className="reveal bg-background p-7 sm:p-10" style={{ transitionDelay: `${i * 80}ms` }}>
+              <p className={`label mb-8 ${o.tone}`}>{o.tag}</p>
+              <h3 className="mb-3 text-2xl font-semibold tracking-tight sm:text-3xl">{o.title}</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">{o.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <Marquee />
 
       <section className="mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-32">
