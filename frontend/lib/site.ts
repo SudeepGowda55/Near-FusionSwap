@@ -1,5 +1,4 @@
-// shortcut: falls back to localhost until NEXT_PUBLIC_SITE_URL is set to the deployed domain (needed for absolute og:image URLs).
-export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://near-fusion-swap.vercel.app";
 export const SITE_NAME = "Near-FusionSwap";
 export const SITE_PITCH = "Trustless WETH → NEAR swaps between Polygon and NEAR, secured by hash time-locked contracts and 1inch Fusion+.";
 export const REPO_URL = "https://github.com/SudeepGowda55/Near-FusionSwap";
