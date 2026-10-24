@@ -6,7 +6,7 @@ import { pageMeta } from "@/lib/site";
 export const metadata = pageMeta(
   "/how-it-works",
   "How it works",
-  "Step by step: how a hash time-locked swap settles between Polygon and NEAR, in both directions."
+  "Step by step: how a hash time-locked swap settles between Polygon and NEAR in both directions, and how timelocks refund either side if it stalls."
 );
 
 const GUARANTEES = [
