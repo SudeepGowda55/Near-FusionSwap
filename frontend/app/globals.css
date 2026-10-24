@@ -2,90 +2,50 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 1inch-inspired dark theme design system */
+/* "Two locks, one secret": ink spec-sheet. Violet = Polygon, mint = NEAR, amber = the hashlock secret. */
 
 @layer base {
-  :root {
-    --background: 220 13% 9%;
-    --foreground: 210 40% 98%;
-
-    --card: 220 13% 11%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 220 13% 11%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 199 89% 48%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 220 13% 15%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 220 13% 15%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 220 13% 15%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 220 13% 20%;
-    --input: 220 13% 15%;
-    --ring: 199 89% 48%;
-
-    --swap-card: 220 13% 13%;
-    --swap-input: 220 13% 18%;
-    --swap-button: 199 89% 48%;
-    --swap-button-hover: 199 89% 52%;
-    
-    --radius: 12px;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
+  :root,
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 240 20% 4%;
+    --foreground: 255 30% 94%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 240 18% 8%;
+    --card-foreground: 255 30% 94%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 240 18% 8%;
+    --popover-foreground: 255 30% 94%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 158 100% 46%;
+    --primary-foreground: 240 20% 4%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 240 17% 13%;
+    --secondary-foreground: 255 30% 94%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 240 17% 13%;
+    --muted-foreground: 248 11% 62%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 240 17% 15%;
+    --accent-foreground: 255 30% 94%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 80% 60%;
+    --destructive-foreground: 255 30% 94%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --border: 240 21% 17%;
+    --input: 240 17% 13%;
+    --ring: 158 100% 46%;
+
+    --swap-card: 240 18% 7%;
+    --swap-input: 240 17% 11%;
+    --swap-button: 158 100% 46%;
+    --swap-button-hover: 158 100% 52%;
+
+    --polygon: 262 75% 63%;
+    --near: 158 100% 46%;
+    --secret: 36 100% 64%;
+
+    --radius: 14px;
+
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -102,7 +62,131 @@
     @apply border-border;
   }
 
+  html {
+    background: hsl(var(--background));
+  }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+  }
+
+  /* blueprint grid on a fixed pseudo-element (not background-attachment: fixed, which repaints every scroll frame) */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      linear-gradient(hsl(var(--border) / 0.35) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.35) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: radial-gradient(ellipse at 50% 0%, #000 20%, transparent 75%);
+  }
+
+  ::selection {
+    background: hsl(var(--secret));
+    color: hsl(var(--background));
+  }
+
+  html.lenis,
+  html.lenis body {
+    height: auto;
+  }
+  .lenis.lenis-smooth {
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer components {
+  .label {
+    @apply font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground;
+  }
+  .btn {
+    @apply relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-full px-6 py-3 text-sm font-semibold transition-colors;
+  }
+  .btn-near {
+    @apply btn bg-primary text-primary-foreground hover:bg-[hsl(var(--swap-button-hover))];
+  }
+  .btn-ghost {
+    @apply btn border border-border text-foreground hover:border-foreground/40;
+  }
+  .rule {
+    @apply border-t border-border;
+  }
+  /* word masks for kinetic headlines; spaces live outside the masks */
+  .word-mask {
+    display: inline-block;
+    overflow: hidden;
+    vertical-align: top;
+    padding-bottom: 0.08em;
+  }
+  .word-mask > span {
+    display: inline-block;
+    will-change: transform;
+  }
+  .reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .reveal.is-in {
+    opacity: 1;
+    transform: none;
+  }
+  .ripple {
+    position: absolute;
+    border-radius: 9999px;
+    pointer-events: none;
+    background: currentColor;
+    opacity: 0.25;
+    transform: scale(0);
+    animation: ripple 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
+
+@keyframes route-pulse {
+  from {
+    top: 0%;
+    opacity: 0;
+  }
+  10%,
+  90% {
+    opacity: 1;
+  }
+  to {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+.route-pulse {
+  animation: route-pulse 2.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@keyframes ripple {
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .kinetic-word {
+    transform: translateY(115%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
